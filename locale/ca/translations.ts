@@ -1282,7 +1282,7 @@
     </message>
     <message>
         <source>Ratings for how good a movie is</source>
-        <translation>Crítiques professionals i de la comunitat de Rotten Tomatoes.</translation>
+        <translation>Valoracions sobre la qualitat d&apos;una pel·lícula</translation>
         <extracomment>User Setting - Setting description</extracomment>
     </message>
     <message>
