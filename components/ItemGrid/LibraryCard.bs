@@ -8,6 +8,7 @@ const CARD_TITLE_LINE = 23
 const CARD_TEXT_GAP = 4
 const CARD_BADGE = 26
 const CARD_BADGE_INSET = 8
+const CARD_COUNT_PAD = 8
 
 sub init()
     m.scaleGroup = m.top.findNode("scaleGroup")
@@ -18,6 +19,7 @@ sub init()
     m.placeholderIcon = m.top.findNode("placeholderIcon")
     m.favoriteBadge = m.top.findNode("favoriteBadge")
     m.watchedBadge = m.top.findNode("watchedBadge")
+    m.watchBg = m.top.findNode("watchBg")
     m.watchIcon = m.top.findNode("watchIcon")
     m.watchCount = m.top.findNode("watchCount")
     m.cardTitle = m.top.findNode("cardTitle")
@@ -62,7 +64,10 @@ sub applyMetrics()
     m.placeholderIcon.translation = [padX + ((posterWidth - 60) / 2), padY + ((posterHeight - 60) / 2)]
 
     m.favoriteBadge.translation = [padX + CARD_BADGE_INSET, padY + CARD_BADGE_INSET]
-    m.watchedBadge.translation = [padX + posterWidth - CARD_BADGE - CARD_BADGE_INSET, padY + CARD_BADGE_INSET]
+
+    ' drawBadges places the watched badge, since its width depends on the count it holds
+    m.badgeRight = padX + posterWidth - CARD_BADGE_INSET
+    m.badgeY = padY + CARD_BADGE_INSET
 
     textY = padY + posterHeight + CARD_TEXT_GAP
     for each label in [m.cardTitle, m.cardSubtitle]
@@ -139,7 +144,20 @@ sub drawBadges(json as object)
     m.watchedBadge.visible = played or hasUnplayed
     m.watchIcon.visible = played and not hasUnplayed
     m.watchCount.visible = hasUnplayed
-    if hasUnplayed then m.watchCount.text = unplayed.toStr()
+
+    ' The count sits in a pill that grows with it, since the circle only fits one digit
+    badgeWidth = CARD_BADGE
+    if hasUnplayed
+        m.watchCount.text = unplayed.toStr()
+        m.watchCount.width = 0
+        badgeWidth = Cint(m.watchCount.boundingRect().width) + (CARD_COUNT_PAD * 2)
+        if badgeWidth < CARD_BADGE then badgeWidth = CARD_BADGE
+    end if
+
+    m.watchBg.uri = hasUnplayed ? "pkg:/images/details/badgefill6.9.png" : "pkg:/images/icons/circle.png"
+    m.watchBg.width = badgeWidth
+    m.watchCount.width = badgeWidth
+    if isValid(m.badgeRight) then m.watchedBadge.translation = [m.badgeRight - badgeWidth, m.badgeY]
 end sub
 
 sub onFocusChanged()

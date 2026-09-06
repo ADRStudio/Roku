@@ -196,8 +196,16 @@ sub onRatingSaved(event as object)
     button = m.top.findNode("personalRatingButton")
     if isValid(button)
         config = ratingButtonConfig(itemData)
-        button.labelText = config.label
-        button.iconUri = config.icon
+        if button.hasField("labelText")
+            button.labelText = config.label
+            button.iconUri = config.icon
+        else
+            ' The classic button is a plain group, so its face is changed piece by piece
+            label = m.top.findNode("personalRatingButtonText")
+            if isValid(label) then label.text = config.label
+            icon = m.top.findNode("personalRatingButtonIcon")
+            if isValid(icon) then icon.uri = config.icon
+        end if
     end if
 end sub
 

@@ -593,14 +593,27 @@ sub setOverviewExpanded(expanded as boolean)
     m.overviewExpanded = expanded
 
     if isValid(m.overview) then m.overview.maxLines = expanded ? 16 : 4
-    if isValid(m.overviewToggle)
-        m.overviewToggle.text = expanded ? tr("Show Less") : tr("Show More")
-        m.overviewToggle.translation = [0, expanded ? 880 : 380]
+
+    ' The toggle follows the text, so a short biography grows by a few lines instead
+    ' of claiming the whole screen
+    toggleY = 380
+    if expanded and isValid(m.overview)
+        toggleY = 150 + Cint(m.overview.boundingRect().height) + 16
+        if toggleY < 380 then toggleY = 380
     end if
 
-    if isValid(m.buttonRow) then m.buttonRow.visible = not expanded
-    if isValid(m.tabBar) then m.tabBar.visible = not expanded and m.filmographyTabs.count() > 0
-    if isValid(m.filmographyRow) then m.filmographyRow.visible = not expanded and m.filmographyTabs.count() > 0
+    if isValid(m.overviewToggle)
+        m.overviewToggle.text = expanded ? tr("Show Less") : tr("Show More")
+        m.overviewToggle.translation = [0, toggleY]
+    end if
+
+    ' Only what the grown text actually reaches makes way for it. The toggle sits 140
+    ' further down on screen than in its own group, and gets a line of air below.
+    bottom = 140 + toggleY + 40
+    hasTabs = m.filmographyTabs.count() > 0
+    if isValid(m.buttonRow) then m.buttonRow.visible = not expanded or bottom <= 570
+    if isValid(m.tabBar) then m.tabBar.visible = hasTabs and (not expanded or bottom <= 648)
+    if isValid(m.filmographyRow) then m.filmographyRow.visible = hasTabs and (not expanded or bottom <= 648)
 end sub
 
 sub onOverviewFocusChanged()
@@ -701,7 +714,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
 
     if key = KeyCode.DOWN
         if isValid(m.overviewGroup) and m.overviewGroup.hasFocus()
-            if m.overviewExpanded then return true
+            if m.overviewExpanded and isValid(m.buttonRow) and not m.buttonRow.visible then return true
             if isValid(m.favoriteButtonGroup)
                 m.favoriteButtonGroup.setFocus(true)
                 updateFavoriteVisual()

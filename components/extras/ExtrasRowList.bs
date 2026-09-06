@@ -287,10 +287,13 @@ sub onExtrasLoaded()
                 if isValid(season.json.ChildCount)
                     season.subTitle = `${season.json.ChildCount} ${tr("episodes")}`
                 end if
+                season.addField("imageWidth", "integer", false)
+                season.imageWidth = 200
                 row.appendChild(season)
             end if
         end for
-        addRowSize([200, 330])
+        ' Tall enough for the poster plus both text lines, or the episode count clips
+        addRowSize([200, 385])
     end if
 
     ' 2. Next Episode (for TV shows only)
