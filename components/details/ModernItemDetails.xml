@@ -89,6 +89,12 @@
                     <Group id="buttonRow" />
                 </Rectangle>
 
+                <!-- Actions folded under More when the row would run behind the up next card -->
+                <Rectangle id="buttonRowExtraContainer" width="1728" height="75"
+                    color="#00000000" visible="false">
+                    <Group id="buttonRowExtra" />
+                </Rectangle>
+
                 <!-- Sits beside the hero column when there is a next episode -->
                 <UpNextCard id="upNextCard" visible="false" />
 

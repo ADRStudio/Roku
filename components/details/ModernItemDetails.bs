@@ -120,6 +120,10 @@ sub init()
 
     m.buttonRow = m.top.findNode("buttonRow")
     m.buttonRowContainer = m.top.findNode("buttonRowContainer")
+    m.buttonRowExtra = m.top.findNode("buttonRowExtra")
+    m.buttonRowExtraContainer = m.top.findNode("buttonRowExtraContainer")
+    m.actionsExpanded = false
+    m.primaryCount = 0
     m.currentButtonIndex = 0
     m.buttonGroups = []
 
@@ -426,6 +430,8 @@ end function
 sub showUpNextCard()
     if not isValid(m.upNextItem)
         m.upNextCard.visible = false
+        foldButtonRow()
+        centerButtonRow()
         return
     end if
 
@@ -456,6 +462,9 @@ sub showUpNextCard()
     m.upNextCard.thumbUrl = upNextThumbUrl(ep)
     m.upNextCard.progress = chainLookupReturn(ep, "json.UserData.PlayedPercentage", 0)
     m.upNextCard.visible = true
+
+    foldButtonRow()
+    centerButtonRow()
 end sub
 
 function hidesMediaDescription() as boolean
@@ -1925,6 +1934,7 @@ sub layoutContainer()
     ' gap rather than letting the column run long
     buttonGap = m.techRow.visible ? HERO_ACTIONS_TIGHT_GAP : HERO_ACTIONS_GAP
     placeHeroRow(m.buttonRowContainer, BUTTON_ROW_HEIGHT, buttonGap)
+    if m.buttonRowExtraContainer.visible then placeHeroRow(m.buttonRowExtraContainer, BUTTON_ROW_HEIGHT, BUTTON_ROW_GAP)
 
     placeHeroRow(m.tabBar, TAB_BAR_HEIGHT, HERO_TABS_GAP)
 
@@ -2121,6 +2131,7 @@ sub onSeerrButtonsStale()
     m.buttonRow.removeChildrenIndex(m.buttonRow.getChildCount(), 0)
     m.buttonGroups = []
     addButtons(m.top.itemContent.json)
+    foldButtonRow()
     centerButtonRow()
 
     if hadFocus and m.buttonGroups.count() > 0
@@ -2134,8 +2145,10 @@ end sub
 sub updateButtonVisibility(itemData as object)
     m.buttonRow.removeChildrenIndex(m.buttonRow.getChildCount(), 0)
     m.buttonGroups = []
+    m.actionsExpanded = false
 
     addButtons(itemData)
+    foldButtonRow()
     centerButtonRow()
 
     if m.buttonGroups.count() > 0
@@ -2433,6 +2446,123 @@ sub addButton(config as object)
     m.buttonGroups.push(buttonGroup)
 end sub
 
+' Folds whatever does not fit under a trailing More button, the way the classic screen
+' handles a long row. The width limit leaves room beside the up next card, and holds back
+' enough for the widest label, since focusing a button grows the row by that much and
+' would otherwise push the tail behind the card.
+sub foldButtonRow()
+    unfoldButtonRow()
+    m.primaryCount = m.buttonGroups.count()
+
+    limit = CONTENT_WIDTH
+    if m.upNextCard.visible then limit = CONTENT_WIDTH - UP_NEXT_WIDTH - (BUTTON_ROW_GAP * 2)
+
+    reserve = 0
+    for each buttonGroup in m.buttonGroups
+        labelNode = buttonGroup.findNode("btnLabel")
+        if isValid(labelNode)
+            labelWidth = labelNode.boundingRect().width + BUTTON_LABEL_PAD
+            if labelWidth > reserve then reserve = labelWidth
+        end if
+    end for
+
+    stride = BUTTON_COLLAPSED_WIDTH + BUTTON_ROW_GAP
+    capacity = Int((limit - reserve + BUTTON_ROW_GAP) / stride)
+    if capacity < 2 then capacity = 2
+
+    if m.buttonGroups.count() <= capacity
+        m.actionsExpanded = false
+        m.buttonRowExtraContainer.visible = false
+        return
+    end if
+
+    for i = capacity - 1 to m.buttonGroups.count() - 1
+        buttonGroup = m.buttonGroups[i]
+        m.buttonRow.removeChild(buttonGroup)
+        m.buttonRowExtra.appendChild(buttonGroup)
+    end for
+
+    moreButton = detailButtons.createModernButton(moreButtonConfig(), 0)
+    moreButton.observeField("focusedChild", "onButtonFocusChanged")
+    m.buttonRow.appendChild(moreButton)
+
+    ' More takes the last slot on the first row, so everything after it renumbers
+    regrouped = []
+    for i = 0 to capacity - 2
+        regrouped.push(m.buttonGroups[i])
+    end for
+    regrouped.push(moreButton)
+    for i = capacity - 1 to m.buttonGroups.count() - 1
+        regrouped.push(m.buttonGroups[i])
+    end for
+    m.buttonGroups = regrouped
+    for i = 0 to m.buttonGroups.count() - 1
+        m.buttonGroups[i].buttonIndex = i
+    end for
+
+    m.primaryCount = capacity
+    m.buttonRowExtraContainer.visible = m.actionsExpanded
+
+    ' A fold can land while focus sits on a button that just moved below, so focus
+    ' retreats to More rather than staying on something hidden
+    if not m.buttonRowExtraContainer.visible
+        for i = m.primaryCount to m.buttonGroups.count() - 1
+            if m.buttonGroups[i].isInFocusChain()
+                focusRowButton(m.primaryCount - 1)
+                exit for
+            end if
+        end for
+        if m.currentButtonIndex >= m.primaryCount then m.currentButtonIndex = m.primaryCount - 1
+    end if
+end sub
+
+' The card can arrive after the row is first drawn, so the fold runs again with the
+' narrower limit. Undoing the previous split first keeps the fold safe to repeat.
+sub unfoldButtonRow()
+    kept = []
+    for each buttonGroup in m.buttonGroups
+        if buttonGroup.id = "moreActionsButton"
+            m.buttonRow.removeChild(buttonGroup)
+        else
+            kept.push(buttonGroup)
+        end if
+    end for
+    m.buttonGroups = kept
+
+    while m.buttonRowExtra.getChildCount() > 0
+        buttonGroup = m.buttonRowExtra.getChild(0)
+        m.buttonRowExtra.removeChild(buttonGroup)
+        m.buttonRow.appendChild(buttonGroup)
+    end while
+
+    for i = 0 to m.buttonGroups.count() - 1
+        m.buttonGroups[i].buttonIndex = i
+    end for
+end sub
+
+function moreButtonConfig() as object
+    return {
+        icon: m.actionsExpanded ? "pkg:/images/icons/chevron-up.png" : "pkg:/images/icons/chevron-down.png",
+        label: m.actionsExpanded ? tr("Less") : tr("More"),
+        action: "toggleMoreActions",
+        id: "moreActionsButton"
+    }
+end function
+
+sub toggleMoreActions()
+    m.actionsExpanded = not m.actionsExpanded
+    m.buttonRowExtraContainer.visible = m.actionsExpanded and m.buttonRowExtra.getChildCount() > 0
+
+    moreButton = m.top.findNode("moreActionsButton")
+    if isValid(moreButton)
+        config = moreButtonConfig()
+        moreButton.iconUri = config.icon
+        moreButton.labelText = config.label
+    end if
+
+    layoutContainer()
+end sub
+
 ' Lays the pill buttons out left to right, giving the focused one room for its
 ' expanded label so the ones after it shift along.
 sub layoutButtonRow(focusIndex as integer)
@@ -2440,6 +2570,7 @@ sub layoutButtonRow(focusIndex as integer)
     for i = 0 to m.buttonGroups.count() - 1
         button = m.buttonGroups[i]
         if button = invalid then continue for
+        if i = m.primaryCount then x = 0
         button.translation = [x, 0]
         width = BUTTON_COLLAPSED_WIDTH
         if i = focusIndex
@@ -2474,6 +2605,16 @@ end sub
 ' Button actions
 ' ============================================
 
+sub focusRowButton(index as integer)
+    if index < 0 or index >= m.buttonGroups.count() then return
+
+    m.buttonGroups[index].setFocus(true)
+    m.top.lastFocus = m.buttonGroups[index]
+    m.currentButtonIndex = index
+    highlightButton(index)
+    setLastFocus(m.buttonGroups[index])
+end sub
+
 sub handleButtonSelect()
     if m.currentButtonIndex < 0 or m.currentButtonIndex >= m.buttonGroups.count() then return
 
@@ -2485,6 +2626,11 @@ sub handleButtonSelect()
 
     if Left(buttonAction, 5) = "seerr"
         startSeerrRequest(buttonAction)
+        return
+    end if
+
+    if buttonAction = "toggleMoreActions"
+        toggleMoreActions()
         return
     end if
 
@@ -2946,7 +3092,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     end if
 
-    if key = KeyCode.UP and m.buttonGroups.count() > 0
+    if key = KeyCode.UP and m.buttonGroups.count() > 0 and m.currentButtonIndex < m.primaryCount
         for each btn in m.buttonGroups
             if btn.hasFocus() or btn.isInFocusChain()
                 unhighlightAllButtons()
@@ -3001,31 +3147,35 @@ function onKeyEvent(key as string, press as boolean) as boolean
 
     if isButtonFocused
         if key = KeyCode.LEFT
-            if m.currentButtonIndex > 0
-                newIndex = m.currentButtonIndex - 1
-                m.buttonGroups[newIndex].setFocus(true)
-                m.top.lastFocus = m.buttonGroups[newIndex]
-                m.currentButtonIndex = newIndex
-                highlightButton(newIndex)
-                setLastFocus(m.buttonGroups[newIndex])
+            rowFirst = m.currentButtonIndex >= m.primaryCount ? m.primaryCount : 0
+            if m.currentButtonIndex > rowFirst
+                focusRowButton(m.currentButtonIndex - 1)
             else
                 return FocusSidebar(m.top)
             end if
             return true
         else if key = KeyCode.RIGHT
-            if m.currentButtonIndex < m.buttonGroups.count() - 1
-                newIndex = m.currentButtonIndex + 1
-                m.buttonGroups[newIndex].setFocus(true)
-                m.top.lastFocus = m.buttonGroups[newIndex]
-                m.currentButtonIndex = newIndex
-                highlightButton(newIndex)
-                setLastFocus(m.buttonGroups[newIndex])
+            rowLast = m.currentButtonIndex < m.primaryCount ? m.primaryCount - 1 : m.buttonGroups.count() - 1
+            if m.currentButtonIndex < rowLast
+                focusRowButton(m.currentButtonIndex + 1)
             end if
             return true
         else if key = KeyCode.OK
             handleButtonSelect()
             return true
+        else if key = KeyCode.UP and m.currentButtonIndex >= m.primaryCount
+            ' Back to the same column on the first row, or to More where the row is shorter
+            column = m.currentButtonIndex - m.primaryCount
+            if column >= m.primaryCount then column = m.primaryCount - 1
+            focusRowButton(column)
+            return true
         else if key = KeyCode.DOWN
+            if m.actionsExpanded and m.currentButtonIndex < m.primaryCount and m.buttonGroups.count() > m.primaryCount
+                column = m.primaryCount + m.currentButtonIndex
+                if column > m.buttonGroups.count() - 1 then column = m.buttonGroups.count() - 1
+                focusRowButton(column)
+                return true
+            end if
             if isValid(m.tabBar) and m.tabsBuilt
                 m.tabBar.setFocus(true)
                 m.top.lastFocus = m.tabBar
