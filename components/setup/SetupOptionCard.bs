@@ -1,0 +1,71 @@
+import "pkg:/components/setup/setupPreviewDraw.bs"
+
+' One pickable layout, shown rather than described: a preview miniature in a
+' frame, its name under it, and a dot marking the current choice.
+sub init()
+    m.built = false
+end sub
+
+sub rebuild()
+    while m.top.getChildCount() > 0
+        m.top.removeChildIndex(0)
+    end while
+    m.built = false
+
+    config = m.top.config
+    if not isValid(config) then return
+
+    m.palette = setupPreviewDraw.Palette()
+    width = config.previewWidth
+    height = config.previewHeight
+
+    m.ring = setupPreviewDraw.Rect(m.top, -4, -4, width + 8, height + 8, m.palette.onSurfaceFaint)
+    setupPreviewDraw.Rect(m.top, 0, 0, width, height, m.palette.background)
+
+    holder = m.top.createChild("Group")
+    holder.clippingRect = [0, 0, width, height]
+    m.preview = holder.createChild(config.previewComponent)
+    if isValid(config.previewFields) then m.preview.setFields(config.previewFields)
+    if isValid(m.top.items) then m.preview.items = m.top.items
+    ' Every preview draws on a full screen canvas and shrinks to the card
+    m.preview.scale = [width / 1920, height / 1080]
+
+    m.label = m.top.createChild("Label")
+    m.label.font = "font:SmallSystemFont"
+    m.label.text = config.label ?? ""
+    textWidth = m.label.boundingRect().width
+    labelX = (width - textWidth) / 2
+    m.label.translation = [labelX, height + 16]
+
+    m.dot = setupPreviewDraw.Rect(m.top, labelX - 26, height + 30, 14, 14, m.palette.onSurface)
+
+    if isValidAndNotEmpty(config.hint)
+        m.hint = m.top.createChild("Label")
+        m.hint.font = "font:SmallestSystemFont"
+        m.hint.text = config.hint
+        m.hint.width = width
+        m.hint.horizAlign = "center"
+        m.hint.translation = [0, height + 62]
+        m.hint.color = m.palette.onSurfaceDim
+    end if
+
+    m.built = true
+    updateState()
+end sub
+
+sub onItemsChanged()
+    if isValid(m.preview) then m.preview.items = m.top.items
+end sub
+
+sub updateState()
+    if not m.built then return
+    if m.top.focused
+        m.ring.color = m.palette.onSurface
+    else if m.top.selected
+        m.ring.color = m.palette.onSurfaceDim
+    else
+        m.ring.color = m.palette.onSurfaceFaint
+    end if
+    m.dot.visible = m.top.selected
+    m.label.color = (m.top.selected or m.top.focused) ? m.palette.onSurface : m.palette.onSurfaceDim
+end sub

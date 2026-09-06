@@ -1,0 +1,132 @@
+import "pkg:/source/enums/ColorPalette.bs"
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/playbackOverlay.bs"
+import "pkg:/source/utils/themeChrome.bs"
+
+' Drawing primitives shared by the setup wizard previews. Every preview is a
+' miniature of the app sketched from rectangles and posters on a 1920x1080
+' canvas, then scaled down to its card.
+namespace setupPreviewDraw
+    function Palette() as object
+        onSurface = themeChrome.OnSurface()
+        return {
+            background: formatSceneGraphColor(chainLookupReturn(m.global.session, "user.settings.colorBackground", ""), ColorPalette.VIEWBACKGROUND),
+            surface: themeChrome.Surface(),
+            surfaceVariant: themeChrome.SurfaceVariant(),
+            onSurface: onSurface,
+            onSurfaceDim: playbackOverlay.WithAlpha(onSurface, 96),
+            onSurfaceFaint: playbackOverlay.WithAlpha(onSurface, 40),
+            accent: themeChrome.Accent(),
+            onAccent: themeChrome.OnAccent(),
+            scrim: "0x00000088",
+            band: playbackOverlay.WithAlpha(onSurface, 200)
+        }
+    end function
+
+    function Rect(parent as object, x as float, y as float, width as float, height as float, color as string) as object
+        node = parent.createChild("Rectangle")
+        node.translation = [x, y]
+        node.width = width
+        node.height = height
+        node.color = color
+        return node
+    end function
+
+    ' A poster that opens on a plain block and keeps it when there is no
+    ' artwork url to load over it
+    function Art(parent as object, x as float, y as float, width as float, height as float, uri as dynamic, fallbackColor as string) as object
+        setupPreviewDraw.Rect(parent, x, y, width, height, fallbackColor)
+        node = parent.createChild("Poster")
+        node.translation = [x, y]
+        node.width = width
+        node.height = height
+        node.loadDisplayMode = "scaleToZoom"
+        if isValidAndNotEmpty(uri) then node.uri = uri
+        return node
+    end function
+
+    ' A row of posters from the preview items, plain blocks when there are
+    ' none yet
+    sub PosterRow(parent as object, items as object, x as float, y as float, cardWidth as float, cardHeight as float, gap as float, count as integer, pal as object, startAt = 0 as integer)
+        for i = 0 to count - 1
+            uri = ""
+            if isValid(items) and items.count() > 0
+                uri = items[(startAt + i) mod items.count()].posterUrl
+            end if
+            setupPreviewDraw.Art(parent, x + i * (cardWidth + gap), y, cardWidth, cardHeight, uri, pal.surfaceVariant)
+        end for
+    end sub
+
+    ' The item's logo when it carries one, a plain title bar when it doesnt
+    sub Logo(parent as object, items as object, index as integer, x as float, y as float, width as float, height as float, barColor as string)
+        uri = setupPreviewDraw.ItemField(items, index, "logoUrl")
+        if isValidAndNotEmpty(uri)
+            node = parent.createChild("Poster")
+            node.translation = [x, y]
+            node.width = width
+            node.height = height
+            node.loadDisplayMode = "scaleToFit"
+            node.uri = uri
+        else
+            setupPreviewDraw.Rect(parent, x, y + height * 0.3, width * 0.75, height * 0.35, barColor)
+        end if
+    end sub
+
+    ' The app's own bottom-fade gradient, so preview scrims feather out the way
+    ' the real screens do instead of ending on a hard line
+    sub Gradient(parent as object, x as float, y as float, width as float, height as float, alpha = 255 as integer)
+        node = parent.createChild("Poster")
+        node.translation = [x, y]
+        node.width = width
+        node.height = height
+        node.loadDisplayMode = "scaleToFill"
+        node.blendColor = "0x000000"
+        node.opacity = alpha / 255
+        node.uri = "pkg:/images/seerr_gradient.png"
+    end sub
+
+    ' One of the app's own icon assets, tinted like the chrome it sits in
+    function Icon(parent as object, uri as string, x as float, y as float, size as float, color as string) as object
+        node = parent.createChild("Poster")
+        node.translation = [x, y]
+        node.width = size
+        node.height = size
+        node.loadDisplayMode = "scaleToFit"
+        node.blendColor = color
+        node.uri = uri
+        return node
+    end function
+
+    ' A run of indicator dots with the active one brightened
+    sub Dots(parent as object, centerX as float, y as float, count as integer, active as integer, pal as object)
+        size = 14
+        gap = 14
+        x = centerX - (count * size + (count - 1) * gap) / 2
+        for i = 0 to count - 1
+            color = pal.onSurfaceFaint
+            if i = active then color = pal.onSurface
+            setupPreviewDraw.Rect(parent, x + i * (size + gap), y, size, size, color)
+        end for
+    end sub
+
+    ' The full bleed featured hero the moonfin media bar opens home with:
+    ' backdrop, logo top left, the light info band along the bottom, dots
+    sub Hero(parent as object, items as object, pal as object, index = 0 as integer)
+        uri = setupPreviewDraw.ItemField(items, index, "backdropUrl")
+        setupPreviewDraw.Art(parent, 0, 0, 1920, 1080, uri, pal.surfaceVariant)
+        setupPreviewDraw.Gradient(parent, 0, 640, 1920, 440, 220)
+        setupPreviewDraw.Logo(parent, items, index, 80, 150, 460, 170, pal.onSurface)
+        setupPreviewDraw.Rect(parent, 48, 830, 1824, 180, pal.band)
+        for i = 0 to 4
+            setupPreviewDraw.Rect(parent, 100 + i * 130, 866, 104, 40, pal.background)
+        end for
+        setupPreviewDraw.Rect(parent, 100, 934, 1500, 22, pal.background)
+        setupPreviewDraw.Rect(parent, 100, 966, 1200, 22, pal.background)
+        setupPreviewDraw.Dots(parent, 960, 1038, 9, 4, pal)
+    end sub
+
+    function ItemField(items as object, index as integer, field as string) as string
+        if not isValid(items) or items.count() = 0 then return ""
+        return items[index mod items.count()][field] ?? ""
+    end function
+end namespace

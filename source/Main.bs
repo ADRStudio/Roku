@@ -1,5 +1,6 @@
 import "pkg:/source/utils/diagnostics.bs"
 import "pkg:/source/utils/settingsSync.bs"
+import "pkg:/source/utils/setupWizardGate.bs"
 import "pkg:/components/manager/ViewCreator.bs"
 import "pkg:/source/enums/ItemType.bs"
 import "pkg:/source/enums/String.bs"
@@ -96,6 +97,17 @@ sub Main (args as dynamic) as void
     MigrateSeerrRegistryNamespace()
     MigrateSeerrConfig()
     MigrateSettings()
+
+    ' Ask the first run questions before the nav is drawn, so a navbar choice
+    ' takes effect on this very launch. The wizard stands in for the What's
+    ' New popup on the launch it runs.
+    if setupWizardGate.ShouldRun()
+        set_user_setting("LastRunVersion", m.global.app.version)
+        setUserColors()
+        stopLoadingSpinner()
+        if not RunSetupWizard() then return
+        startLoadingSpinner()
+    end if
 
     navPosition = get_user_setting("navbar.position")
     if isValid(sidebar)

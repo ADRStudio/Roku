@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="SetupNavbarPreview" extends="Group">
+  <interface>
+    <field id="position" type="string" value="top" />
+    <field id="items" type="array" onChange="redraw" />
+  </interface>
+</component>

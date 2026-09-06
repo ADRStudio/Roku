@@ -1574,6 +1574,13 @@
         ]
       },
       {
+        "title": "Run Setup Again",
+        "description": "Walk through the first run questions again: navigation, media bar, rows, details, and theme.",
+        "settingName": "moonfin.runSetupWizard",
+        "icon": "personalization.png",
+        "type": ""
+      },
+      {
         "title": "Support Moonfin",
         "description": "Help support continued development of Moonfin. Press OK to learn more or visit https://buymeacoffee.com/moonfin.",
         "settingName": "moonfin.showDonation",

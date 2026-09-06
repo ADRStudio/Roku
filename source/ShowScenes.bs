@@ -501,6 +501,27 @@ function CreateSigninGroup(user = "")
     return ""
 end function
 
+' Runs the first run setup wizard and blocks until it finishes. Returns
+' false only when the screen closed under it.
+function RunSetupWizard() as boolean
+    group = CreateObject("roSGNode", "SetupWizard")
+    m.global.sceneManager.callFunc("pushScene", group)
+    port = CreateObject("roMessagePort")
+    group.observeField("wizardDone", port)
+
+    while true
+        msg = wait(0, port)
+        if type(msg) = "roSGScreenEvent" and msg.isScreenClosed()
+            return false
+        else if isNodeEvent(msg, "wizardDone")
+            exit while
+        end if
+    end while
+
+    group.visible = false
+    return true
+end function
+
 function CreateHomeGroup()
     ' Main screen after logging in. Shows the user's libraries
     group = CreateObject("roSGNode", "Home")

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="SetupPreviewItemsTask" extends="Task">
+  <interface>
+    <field id="items" type="array" value="[]" />
+  </interface>
+</component>

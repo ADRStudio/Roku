@@ -1,0 +1,61 @@
+import "pkg:/source/api/sdk.bs"
+import "pkg:/source/utils/misc.bs"
+
+' A small pull of random library items, shaped down to the artwork urls the
+' wizard previews draw. The previews open on drawn stand ins, so a miss here
+' costs looks, not progress.
+sub init()
+    m.top.functionName = "loadItems"
+end sub
+
+sub loadItems()
+    query = {
+        UserId: m.global.session.user.id,
+        SortBy: "Random",
+        IncludeItemTypes: "Movie,Series",
+        Recursive: true,
+        ImageTypeLimit: 1,
+        EnableImageTypes: "Primary,Backdrop,Logo",
+        Fields: "BackdropImageTags",
+        Limit: 10,
+        ImageTypes: "Backdrop"
+    }
+
+    data = api.items.Get(query)
+    items = adaptItems(data)
+    if items.count() = 0
+        ' A library without backdrops has been answering the same empty list
+        ' every time, so ask again without that requirement before giving up
+        ' on real artwork
+        query.Delete("ImageTypes")
+        data = api.items.Get(query)
+        items = adaptItems(data)
+    end if
+
+    m.top.items = items
+end sub
+
+function adaptItems(data as dynamic) as object
+    items = []
+    if not isValid(data) or not isValid(data.Items) then return items
+
+    for each item in data.Items
+        adapted = {
+            posterUrl: "",
+            backdropUrl: "",
+            logoUrl: ""
+        }
+        if isChainValid(item, "ImageTags.Primary")
+            adapted.posterUrl = api.items.GetImageURL(item.id, "primary", 0, { "maxWidth": "400", "quality": "90" })
+        end if
+        if isValid(item.BackdropImageTags) and item.BackdropImageTags.count() > 0
+            adapted.backdropUrl = api.items.GetImageURL(item.id, "backdrop", 0, { "maxWidth": "1280", "quality": "90" })
+        end if
+        if isChainValid(item, "ImageTags.Logo")
+            adapted.logoUrl = api.items.GetImageURL(item.id, "logo", 0, { "maxWidth": "800", "quality": "90" })
+        end if
+        items.push(adapted)
+    end for
+
+    return items
+end function

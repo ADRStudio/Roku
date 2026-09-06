@@ -1,0 +1,63 @@
+import "pkg:/components/setup/setupPreviewDraw.bs"
+
+' A miniature home screen with the navigation drawn where the choice would
+' put it, the pill bar across the top or a rail down the left. The screen
+' behind it is the featured hero home actually opens on, and the chrome uses
+' the app's real icons and logo.
+sub init()
+    redraw()
+end sub
+
+function navIcons() as object
+    return [
+        "pkg:/images/icons/home.png",
+        "pkg:/images/icons/search-light.png",
+        "pkg:/images/icons/shuffle.png",
+        "pkg:/images/icons/masks.png",
+        "pkg:/images/icons/library.png",
+        "pkg:/images/icons/settings.png"
+    ]
+end function
+
+sub redraw()
+    while m.top.getChildCount() > 0
+        m.top.removeChildIndex(0)
+    end while
+
+    pal = setupPreviewDraw.Palette()
+    items = m.top.items
+    leftNav = isStringEqual(m.top.position, "left")
+
+    setupPreviewDraw.Rect(m.top, 0, 0, 1920, 1080, pal.background)
+    setupPreviewDraw.Hero(m.top, items, pal, 0)
+
+    icons = navIcons()
+    if leftNav
+        setupPreviewDraw.Rect(m.top, 0, 0, 110, 1080, pal.surface)
+        setupPreviewDraw.Icon(m.top, "pkg:/images/baseline_person_white_48dp.png", 33, 60, 44, pal.onSurfaceDim)
+        index = 0
+        for each uri in icons
+            color = pal.onSurfaceDim
+            if index = 0 then color = pal.onSurface
+            setupPreviewDraw.Icon(m.top, uri, 33, 380 + index * 70, 44, color)
+            index++
+        end for
+    else
+        logo = m.top.createChild("Poster")
+        logo.translation = [64, 36]
+        logo.width = 56
+        logo.height = 56
+        logo.loadDisplayMode = "scaleToFit"
+        logo.uri = "pkg:/images/logo.png"
+
+        setupPreviewDraw.Rect(m.top, 740, 28, 440, 76, "0x22252BE6")
+        index = 0
+        for each uri in icons
+            color = pal.onSurfaceDim
+            if index = 0 then color = pal.onSurface
+            setupPreviewDraw.Icon(m.top, uri, 772 + index * 66, 46, 40, color)
+            index++
+        end for
+        setupPreviewDraw.Rect(m.top, 1740, 48, 120, 32, pal.onSurfaceDim)
+    end if
+end sub

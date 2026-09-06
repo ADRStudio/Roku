@@ -1,0 +1,58 @@
+import "pkg:/source/utils/config.bs"
+import "pkg:/source/utils/misc.bs"
+
+' Decides whether the first run setup wizard runs, and for which steps.
+' ShouldRun stays a handful of registry reads. The profile pull already ran
+' synchronously inside sign in, so by the time anyone asks, every synced
+' answer is in the registry.
+namespace setupWizardGate
+    ' Bumped only when a release adds a step. Everything already answered
+    ' stays answered.
+    const VERSION = 1
+
+    ' Which questions the wizard can ask, in the order shown. The navbar
+    ' leads because it is the frame everything after it sits in.
+    function QuestionSteps() as object
+        return [
+            { step: "navbar", rokuKey: "navbar.position" },
+            { step: "mediaBar", rokuKey: "ui.home.mediaBarMode" },
+            { step: "homeRows", rokuKey: "ui.home.rowsStyle" },
+            { step: "detailStyle", rokuKey: "ui.itemdetail.style" }
+        ]
+    end function
+
+    ' A key reaches the registry from a server profile or a deliberate
+    ' choice, never from the defaults, so presence alone says whether a
+    ' person ever answered.
+    function RemainingSteps(rerun as boolean) as object
+        steps = []
+        userId = m.global.session.user.id
+        for each question in setupWizardGate.QuestionSteps()
+            if rerun or registry_read(question.rokuKey, userId) = invalid
+                steps.push(question.step)
+            end if
+        end for
+        ' The tour only pays for itself alongside something else. On its own
+        ' it is a splash screen between the user and the app they came to open.
+        if steps.count() = 0 then return []
+        steps.push("tour")
+        return steps
+    end function
+
+    function CompletionKey() as string
+        return `setupWizard.version.${m.global.session.server.id}`
+    end function
+
+    function ShouldRun() as boolean
+        stored = registry_read(setupWizardGate.CompletionKey(), m.global.session.user.id)
+        if isValid(stored) and Val(stored) >= setupWizardGate.VERSION then return false
+        return setupWizardGate.RemainingSteps(false).count() > 0
+    end function
+
+    ' Marks this server and user as set up, whether they answered every
+    ' question or skipped the lot. Skipping is an answer, it means stop asking.
+    sub MarkComplete()
+        ver = setupWizardGate.VERSION
+        registry_write(setupWizardGate.CompletionKey(), ver.toStr(), m.global.session.user.id)
+    end sub
+end namespace

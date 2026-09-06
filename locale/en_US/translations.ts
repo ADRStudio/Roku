@@ -13,8 +13,28 @@
         <translation>Action Buttons</translation>
     </message>
     <message>
+        <source>All the details on one page.</source>
+        <translation>All the details on one page.</translation>
+    </message>
+    <message>
+        <source>And plenty more</source>
+        <translation>And plenty more</translation>
+    </message>
+    <message>
         <source>Aya</source>
         <translation>Aya</translation>
+    </message>
+    <message>
+        <source>Back</source>
+        <translation>Back</translation>
+    </message>
+    <message>
+        <source>Banner</source>
+        <translation>Banner</translation>
+    </message>
+    <message>
+        <source>Bookshelf</source>
+        <translation>Bookshelf</translation>
     </message>
     <message>
         <source>Cancel</source>
@@ -25,8 +45,28 @@
         <translation>Choose which buttons appear on the details screen action row and what order they run in. Press OK to show or hide a button, and Left or Right to move it. Play, Resume and Restart always lead the row.</translation>
     </message>
     <message>
+        <source>Cinematic, with tabs for cast and extras.</source>
+        <translation>Cinematic, with tabs for cast and extras.</translation>
+    </message>
+    <message>
+        <source>Classic</source>
+        <translation>Classic</translation>
+    </message>
+    <message>
+        <source>Compact. More rows on screen at once.</source>
+        <translation>Compact. More rows on screen at once.</translation>
+    </message>
+    <message>
         <source>Connect to Server</source>
         <translation>Connect to Server</translation>
+    </message>
+    <message>
+        <source>Custom themes</source>
+        <translation>Custom themes</translation>
+    </message>
+    <message>
+        <source>Done</source>
+        <translation>Done</translation>
     </message>
     <message>
         <source>Ends at %1</source>
@@ -41,12 +81,36 @@
         <translation>Favorite</translation>
     </message>
     <message>
+        <source>Gallery</source>
+        <translation>Gallery</translation>
+    </message>
+    <message>
         <source>Go to Series</source>
         <translation>Go to Series</translation>
     </message>
     <message>
+        <source>How should a movie or show look when you open it?</source>
+        <translation>How should a movie or show look when you open it?</translation>
+    </message>
+    <message>
+        <source>How should the top of your Home screen look?</source>
+        <translation>How should the top of your Home screen look?</translation>
+    </message>
+    <message>
+        <source>How should your rows look?</source>
+        <translation>How should your rows look?</translation>
+    </message>
+    <message>
         <source>Instant Mix</source>
         <translation>Instant Mix</translation>
+    </message>
+    <message>
+        <source>Larger cards with titles underneath.</source>
+        <translation>Larger cards with titles underneath.</translation>
+    </message>
+    <message>
+        <source>Left Sidebar</source>
+        <translation>Left Sidebar</translation>
     </message>
     <message>
         <source>Loading...</source>
@@ -57,8 +121,28 @@
         <translation>Login attempt failed.</translation>
     </message>
     <message>
+        <source>MakD</source>
+        <translation>MakD</translation>
+    </message>
+    <message>
         <source>Mark Watched</source>
         <translation>Mark Watched</translation>
+    </message>
+    <message>
+        <source>Modern</source>
+        <translation>Modern</translation>
+    </message>
+    <message>
+        <source>Moonfin</source>
+        <translation>Moonfin</translation>
+    </message>
+    <message>
+        <source>Next</source>
+        <translation>Next</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation>Off</translation>
     </message>
     <message>
         <source>OK</source>
@@ -67,6 +151,10 @@
     <message>
         <source>Options</source>
         <translation>Options</translation>
+    </message>
+    <message>
+        <source>Pick a look</source>
+        <translation>Pick a look</translation>
     </message>
     <message>
         <source>Play</source>
@@ -93,12 +181,20 @@
         <translation>Resume</translation>
     </message>
     <message>
+        <source>Run Setup Again</source>
+        <translation>Run Setup Again</translation>
+    </message>
+    <message>
         <source>Save</source>
         <translation>Save</translation>
     </message>
     <message>
         <source>Search</source>
         <translation>Search</translation>
+    </message>
+    <message>
+        <source>Seerr requests</source>
+        <translation>Seerr requests</translation>
     </message>
     <message>
         <source>Server not found, is it online?</source>
@@ -113,12 +209,28 @@
         <translation>Sign In</translation>
     </message>
     <message>
+        <source>Skip setup</source>
+        <translation>Skip setup</translation>
+    </message>
+    <message>
         <source>Submit</source>
         <translation>Submit</translation>
     </message>
     <message>
         <source>Subtitle</source>
         <translation>Subtitle</translation>
+    </message>
+    <message>
+        <source>SyncPlay watch parties</source>
+        <translation>SyncPlay watch parties</translation>
+    </message>
+    <message>
+        <source>There is more waiting in Settings</source>
+        <translation>There is more waiting in Settings</translation>
+    </message>
+    <message>
+        <source>Top Bar</source>
+        <translation>Top Bar</translation>
     </message>
     <message>
         <source>Trailer</source>
@@ -131,6 +243,10 @@
     <message>
         <source>Versions</source>
         <translation>Versions</translation>
+    </message>
+    <message>
+        <source>Walk through the first run questions again: navigation, media bar, rows, details, and theme.</source>
+        <translation>Walk through the first run questions again: navigation, media bar, rows, details, and theme.</translation>
     </message>
     <message>
         <source>Watched</source>
@@ -416,6 +532,10 @@
         <source>today</source>
         <translation>today</translation>
         <extracomment>Current day</extracomment>
+    </message>
+    <message>
+        <source>Where should navigation go?</source>
+        <translation>Where should navigation go?</translation>
     </message>
     <message>
         <source>yesterday</source>
@@ -2436,6 +2556,10 @@
     <message>
         <source>Date Added</source>
         <translation>Date Added</translation>
+    </message>
+    <message>
+        <source>You're set. Here's what else is in here.</source>
+        <translation>You're set. Here's what else is in here.</translation>
     </message>
 </context>
 </TS>

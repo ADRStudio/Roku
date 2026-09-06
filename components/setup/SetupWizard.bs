@@ -1,0 +1,551 @@
+import "pkg:/components/setup/setupPreviewDraw.bs"
+import "pkg:/source/utils/config.bs"
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/settingsSync.bs"
+import "pkg:/source/utils/setupWizardGate.bs"
+import "pkg:/source/utils/themeApply.bs"
+import "pkg:/source/utils/themeRegistry.bs"
+
+' The first thing a new user sees after signing in: a few questions about how
+' the app should look, each shown as preview cards, then a look at what else
+' is in here. It only asks about things it cant work out on its own, and
+' only about things a person can answer by looking.
+sub init()
+    m.top.optionsAvailable = false
+    m.built = false
+    m.steps = []
+    m.stepIndex = 0
+    m.answers = {}
+    m.items = []
+    m.cards = []
+    m.swatches = []
+    m.focusZone = "cards"
+    m.cardIndex = 0
+    m.swatchIndex = 0
+    m.lastContentZone = "cards"
+
+    m.itemsTask = createObject("roSGNode", "SetupPreviewItemsTask")
+    m.itemsTask.observeFieldScoped("items", "onPreviewItemsLoaded")
+    m.itemsTask.control = "RUN"
+end sub
+
+sub OnScreenShown(_isReturning = false as boolean)
+    if not m.built
+        m.built = true
+        m.steps = setupWizardGate.RemainingSteps(m.top.rerun)
+        if m.steps.count() = 0
+            ' Everything was answered on another device or an earlier visit,
+            ' so there is nothing to show and nothing to ask again
+            closeWizard()
+            return
+        end if
+        ' What the answers were when the wizard opened, so a re-run can tell
+        ' which live signals to send at the end
+        m.initialNavPosition = effectiveValue("navbar")
+        m.initialMediaBarMode = effectiveValue("mediaBar")
+        buildShell()
+        buildStep()
+    end if
+    m.top.setFocus(true)
+end sub
+
+sub onPreviewItemsLoaded()
+    m.items = m.itemsTask.items
+    for each card in m.cards
+        card.items = m.items
+    end for
+end sub
+
+' The static frame every step of the wizard sits in: dots, Skip, the
+' question, and the Back and Next actions
+sub buildShell()
+    palette = setupPreviewDraw.Palette()
+
+    m.background = setupPreviewDraw.Rect(m.top, 0, 0, 1920, 1080, palette.background)
+    m.dotsGroup = m.top.createChild("Group")
+
+    m.skipLabel = m.top.createChild("Label")
+    m.skipLabel.font = "font:SmallSystemFont"
+    m.skipLabel.text = tr("Skip setup")
+    skipWidth = m.skipLabel.boundingRect().width
+    m.skipLabel.translation = [1824 - skipWidth, 88]
+    m.skipUnderline = setupPreviewDraw.Rect(m.top, 1824 - skipWidth, 132, skipWidth, 3, palette.onSurface)
+
+    m.questionLabel = m.top.createChild("Label")
+    m.questionLabel.font = "font:LargeSystemFont"
+    m.questionLabel.width = 1920
+    m.questionLabel.horizAlign = "center"
+    m.questionLabel.translation = [0, 156]
+
+    m.stepHolder = m.top.createChild("Group")
+
+    m.backLabel = m.top.createChild("Label")
+    m.backLabel.font = "font:SmallSystemFont"
+    m.backLabel.text = tr("Back")
+    backWidth = m.backLabel.boundingRect().width
+    m.backLabel.translation = [96, 950]
+    m.backUnderline = setupPreviewDraw.Rect(m.top, 96, 994, backWidth, 3, palette.onSurface)
+
+    m.nextRing = setupPreviewDraw.Rect(m.top, 1556, 926, 272, 84, palette.onSurface)
+    m.nextRect = setupPreviewDraw.Rect(m.top, 1560, 930, 264, 76, palette.accent)
+    m.nextLabel = m.top.createChild("Label")
+    m.nextLabel.font = "font:SmallBoldSystemFont"
+    m.nextLabel.width = 264
+    m.nextLabel.height = 76
+    m.nextLabel.horizAlign = "center"
+    m.nextLabel.vertAlign = "center"
+    m.nextLabel.translation = [1560, 930]
+end sub
+
+' The tour restyles the shell live when a theme lands, so the colors are
+' reapplied rather than set once
+sub refreshShellPalette()
+    palette = setupPreviewDraw.Palette()
+    m.background.color = palette.background
+    m.questionLabel.color = palette.onSurface
+    m.nextRect.color = palette.accent
+    m.nextLabel.color = palette.onAccent
+end sub
+
+function questionFor(stepName as string) as string
+    if isStringEqual(stepName, "navbar") then return tr("Where should navigation go?")
+    if isStringEqual(stepName, "mediaBar") then return tr("How should the top of your Home screen look?")
+    if isStringEqual(stepName, "homeRows") then return tr("How should your rows look?")
+    if isStringEqual(stepName, "detailStyle") then return tr("How should a movie or show look when you open it?")
+    return tr("You're set. Here's what else is in here.")
+end function
+
+function rokuKeyFor(stepName as string) as string
+    for each question in setupWizardGate.QuestionSteps()
+        if isStringEqual(question.step, stepName) then return question.rokuKey
+    end for
+    return ""
+end function
+
+' The held answer when there is one, the current setting otherwise, which
+' always exists because the defaults are merged into the session at load.
+' Another client can have stored the detail style in its own spelling, so
+' both are read
+function effectiveValue(stepName as string) as string
+    key = rokuKeyFor(stepName)
+    if key = "" then return ""
+    held = m.answers[key]
+    if isValidAndNotEmpty(held) then return held
+    current = toString(m.global.session.user.settings[key])
+    if isStringEqual(stepName, "detailStyle")
+        if isStringEqual(current, "v1") then return "classic"
+        if isStringEqual(current, "v2") then return "modern"
+    end if
+    return current
+end function
+
+function stepConfigs(stepName as string) as object
+    if isStringEqual(stepName, "navbar")
+        return [
+            { value: "top", label: tr("Top Bar"), previewComponent: "SetupNavbarPreview", previewFields: { position: "top" } },
+            { value: "left", label: tr("Left Sidebar"), previewComponent: "SetupNavbarPreview", previewFields: { position: "left" } }
+        ]
+    end if
+    if isStringEqual(stepName, "mediaBar")
+        configs = []
+        for each mode in [["moonfin", "Moonfin"], ["makd", "MakD"], ["bookshelf", "Bookshelf"], ["gallery", "Gallery"], ["banner", "Banner"], ["aya", "Aya"], ["off", "Off"]]
+            configs.push({ value: mode[0], label: tr(mode[1]), previewComponent: "SetupMediaBarPreview", previewFields: { mode: mode[0] } })
+        end for
+        return configs
+    end if
+    if isStringEqual(stepName, "homeRows")
+        return [
+            { value: "v1", label: tr("Classic"), hint: tr("Compact. More rows on screen at once."), previewComponent: "SetupHomeRowsPreview", previewFields: { modern: false } },
+            { value: "v2", label: tr("Modern"), hint: tr("Larger cards with titles underneath."), previewComponent: "SetupHomeRowsPreview", previewFields: { modern: true } }
+        ]
+    end if
+    return [
+        { value: "classic", label: tr("Classic"), hint: tr("All the details on one page."), previewComponent: "SetupDetailPreview", previewFields: { modern: false } },
+        { value: "modern", label: tr("Modern"), hint: tr("Cinematic, with tabs for cast and extras."), previewComponent: "SetupDetailPreview", previewFields: { modern: true } }
+    ]
+end function
+
+sub buildStep()
+    while m.stepHolder.getChildCount() > 0
+        m.stepHolder.removeChildIndex(0)
+    end while
+    m.cards = []
+    m.swatches = []
+
+    palette = setupPreviewDraw.Palette()
+    stepName = m.steps[m.stepIndex]
+    m.questionLabel.text = questionFor(stepName)
+
+    while m.dotsGroup.getChildCount() > 0
+        m.dotsGroup.removeChildIndex(0)
+    end while
+    for i = 0 to m.steps.count() - 1
+        color = i = m.stepIndex ? palette.onSurface : palette.onSurfaceFaint
+        setupPreviewDraw.Rect(m.dotsGroup, 96 + i * 36, 92, 16, 16, color)
+    end for
+
+    m.backLabel.visible = m.stepIndex > 0
+    isLast = m.stepIndex >= m.steps.count() - 1
+    m.nextLabel.text = isLast ? tr("Done") : tr("Next")
+
+    if isStringEqual(stepName, "tour")
+        buildTour()
+        m.focusZone = "swatches"
+        m.lastContentZone = "swatches"
+    else
+        buildCards(stepName)
+        m.focusZone = "cards"
+        m.lastContentZone = "cards"
+    end if
+    refreshShellPalette()
+    applyFocus()
+end sub
+
+sub buildCards(stepName as string)
+    configs = stepConfigs(stepName)
+    effective = effectiveValue(stepName)
+    m.cardIndex = 0
+
+    if configs.count() > 4
+        previewWidth = 384
+        previewHeight = 216
+        columns = 4
+        x0 = 144
+        y0 = 290
+        strideX = previewWidth + 32
+        strideY = 302
+    else
+        previewWidth = 720
+        previewHeight = 405
+        columns = configs.count()
+        x0 = (1920 - configs.count() * 720 - (configs.count() - 1) * 48) / 2
+        y0 = 280
+        strideX = previewWidth + 48
+        strideY = 0
+    end if
+
+    index = 0
+    for each config in configs
+        config.previewWidth = previewWidth
+        config.previewHeight = previewHeight
+        card = m.stepHolder.createChild("SetupOptionCard")
+        card.config = config
+        card.items = m.items
+        card.translation = [x0 + (index mod columns) * strideX, y0 + Int(index / columns) * strideY]
+        card.selected = isStringEqual(config.value, effective)
+        if card.selected then m.cardIndex = index
+        m.cards.push(card)
+        index++
+    end for
+end sub
+
+sub buildTour()
+    palette = setupPreviewDraw.Palette()
+
+    pickLabel = m.stepHolder.createChild("Label")
+    pickLabel.font = "font:SmallSystemFont"
+    pickLabel.color = palette.onSurfaceDim
+    pickLabel.text = tr("Pick a look")
+    pickLabel.translation = [216, 260]
+
+    activeThemeId = toString(m.global.session.user.settings["ui.theme.customThemeId"])
+    if not isValidAndNotEmpty(activeThemeId) then activeThemeId = "moonfin"
+    m.swatchIndex = 0
+
+    index = 0
+    for each themeId in themeRegistry.BuiltInIds()
+        theme = themeRegistry.ReadBundledTheme(themeId)
+        if isValid(theme)
+            swatch = m.stepHolder.createChild("SetupThemeSwatch")
+            swatch.themeName = theme.displayName ?? themeId
+            swatch.themeId = themeId
+            swatch.translation = [216 + index * 320, 320]
+            swatch.selected = isStringEqual(themeId, activeThemeId)
+            if swatch.selected then m.swatchIndex = index
+            m.swatches.push(swatch)
+            index++
+        end if
+    end for
+
+    setupPreviewDraw.Rect(m.stepHolder, 1176, 316, 628, 468, palette.onSurfaceFaint)
+    setupPreviewDraw.Rect(m.stepHolder, 1180, 320, 620, 460, palette.surface)
+
+    header = m.stepHolder.createChild("Label")
+    header.font = "font:MediumBoldSystemFont"
+    header.color = palette.onSurface
+    header.width = 540
+    header.wrap = true
+    header.text = tr("There is more waiting in Settings")
+    header.translation = [1220, 360]
+
+    bullets = [tr("Seerr requests"), tr("SyncPlay watch parties"), tr("Live TV"), tr("Custom themes"), tr("And plenty more")]
+    index = 0
+    for each bullet in bullets
+        line = m.stepHolder.createChild("Label")
+        line.font = "font:SmallSystemFont"
+        line.color = palette.onSurfaceDim
+        line.text = `• ${bullet}`
+        line.translation = [1220, 470 + index * 54]
+        index++
+    end for
+end sub
+
+sub applyFocus()
+    palette = setupPreviewDraw.Palette()
+
+    index = 0
+    for each card in m.cards
+        card.focused = isStringEqual(m.focusZone, "cards") and index = m.cardIndex
+        index++
+    end for
+    index = 0
+    for each swatch in m.swatches
+        swatch.focused = isStringEqual(m.focusZone, "swatches") and index = m.swatchIndex
+        index++
+    end for
+
+    skipFocused = isStringEqual(m.focusZone, "skip")
+    m.skipLabel.color = skipFocused ? palette.onSurface : palette.onSurfaceDim
+    m.skipUnderline.visible = skipFocused
+    m.skipUnderline.color = palette.onSurface
+
+    backFocused = isStringEqual(m.focusZone, "back")
+    m.backLabel.color = backFocused ? palette.onSurface : palette.onSurfaceDim
+    m.backUnderline.visible = backFocused and m.backLabel.visible
+
+    m.nextRing.visible = isStringEqual(m.focusZone, "next")
+end sub
+
+' Which grid the cards sit in, so up and down can hop rows on the media bar
+' step and leave the row on every other one
+function cardColumns() as integer
+    if m.cards.count() > 4 then return 4
+    return m.cards.count()
+end function
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+
+    ' BACK never leaves the wizard on the first press. It moves to Skip, so
+    ' the way out is always something the user chose to press twice.
+    if key = "back"
+        if isStringEqual(m.focusZone, "skip")
+            doSkip()
+        else
+            m.focusZone = "skip"
+            applyFocus()
+        end if
+        return true
+    end if
+
+    if key = "OK"
+        handleSelect()
+        return true
+    end if
+
+    if key = "left" or key = "right" or key = "up" or key = "down"
+        handleArrow(key)
+        return true
+    end if
+
+    return false
+end function
+
+sub handleSelect()
+    if isStringEqual(m.focusZone, "cards")
+        selectCard(m.cardIndex)
+    else if isStringEqual(m.focusZone, "swatches")
+        applySwatchTheme(m.swatchIndex)
+    else if isStringEqual(m.focusZone, "skip")
+        doSkip()
+    else if isStringEqual(m.focusZone, "back")
+        goBack()
+    else if isStringEqual(m.focusZone, "next")
+        advance()
+    end if
+end sub
+
+sub handleArrow(key as string)
+    zone = m.focusZone
+    if isStringEqual(zone, "cards")
+        columns = cardColumns()
+        if key = "left" and m.cardIndex > 0
+            m.cardIndex--
+        else if key = "right" and m.cardIndex < m.cards.count() - 1
+            m.cardIndex++
+        else if key = "up"
+            if m.cardIndex >= columns
+                m.cardIndex -= columns
+            else
+                m.focusZone = "skip"
+            end if
+        else if key = "down"
+            if m.cardIndex + columns < m.cards.count()
+                m.cardIndex += columns
+            else
+                m.focusZone = "next"
+            end if
+        end if
+    else if isStringEqual(zone, "swatches")
+        if key = "left" and m.swatchIndex > 0
+            m.swatchIndex--
+        else if key = "right" and m.swatchIndex < m.swatches.count() - 1
+            m.swatchIndex++
+        else if key = "up"
+            m.focusZone = "skip"
+        else if key = "down"
+            m.focusZone = "next"
+        end if
+    else if isStringEqual(zone, "skip")
+        if key = "down" then m.focusZone = m.lastContentZone
+    else if isStringEqual(zone, "next")
+        if key = "up"
+            m.focusZone = m.lastContentZone
+        else if key = "left" and m.backLabel.visible
+            m.focusZone = "back"
+        end if
+    else if isStringEqual(zone, "back")
+        if key = "right"
+            m.focusZone = "next"
+        else if key = "up"
+            m.focusZone = m.lastContentZone
+        end if
+    end if
+    applyFocus()
+end sub
+
+sub selectCard(index as integer)
+    key = rokuKeyFor(m.steps[m.stepIndex])
+    if key = "" then return
+    m.answers[key] = m.cards[index].config.value
+    i = 0
+    for each card in m.cards
+        card.selected = i = index
+        i++
+    end for
+end sub
+
+' Written straight away rather than held back with the rest, because the
+' point is that the wizard restyles around you
+sub applySwatchTheme(index as integer)
+    themeId = m.swatches[index].themeId
+    theme = themeRegistry.ReadBundledTheme(themeId)
+    if not isValid(theme) then return
+
+    themeApply.ApplyTheme(theme, m.top.getScene())
+
+    pushData = settingsSync.PreparePush("ui.theme.customThemeId", themeId)
+    if isValid(pushData)
+        m.themePushTask = createObject("roSGNode", "PostTask")
+        m.themePushTask.apiUrl = pushData.url
+        m.themePushTask.stringData = pushData.body
+        m.themePushTask.control = "RUN"
+    end if
+
+    savedIndex = m.swatchIndex
+    buildStep()
+    m.swatchIndex = savedIndex
+    applyFocus()
+end sub
+
+sub advance()
+    if m.stepIndex >= m.steps.count() - 1
+        finish()
+        return
+    end if
+    m.stepIndex++
+    buildStep()
+end sub
+
+sub goBack()
+    if m.stepIndex = 0 then return
+    m.stepIndex--
+    buildStep()
+end sub
+
+' Skipping leaves without answering anything, and without being asked again.
+' Writing the defaults here would mark them as deliberate choices and stop
+' any future device from asking, so only the completion mark lands.
+sub doSkip()
+    setupWizardGate.MarkComplete()
+    closeWizard()
+end sub
+
+sub finish()
+    for each key in m.answers
+        set_user_setting(key, m.answers[key])
+    end for
+
+    ' Held rather than pushed as they are chosen, so the answers across the
+    ' steps land on the server as one batch
+    if m.answers.count() > 0 and settingsSync.IsSyncEnabled()
+        profileData = {}
+        for each key in m.answers
+            mapping = settingsSync.FindMappingByRokuKey(key)
+            if isValid(mapping)
+                pluginValue = settingsSync.RokuToPlugin(m.answers[key], mapping.type)
+                if isValid(pluginValue) then profileData[mapping.pluginKey] = pluginValue
+            end if
+        end for
+        if profileData.count() > 0
+            pushData = settingsSync.ProfilePush(profileData)
+            m.profilePushTask = createObject("roSGNode", "PostTask")
+            m.profilePushTask.apiUrl = pushData.url
+            m.profilePushTask.stringData = pushData.body
+            m.profilePushTask.control = "RUN"
+        end if
+    end if
+
+    setupWizardGate.MarkComplete()
+    if m.top.rerun then applyLiveChanges()
+    closeWizard()
+end sub
+
+' On a re-run home already exists, so the choices are applied the same way
+' the settings screen applies them. On a first run Main reads the fresh
+' values right after the wizard returns and none of this is needed.
+sub applyLiveChanges()
+    mediaBarMode = m.answers["ui.home.mediaBarMode"]
+    if isValidAndNotEmpty(mediaBarMode) and not isStringEqual(mediaBarMode, m.initialMediaBarMode)
+        if m.global.hasField("mediaBarModeChanged")
+            m.global.mediaBarModeChanged = m.global.mediaBarModeChanged + 1
+        end if
+    end if
+
+    navPosition = m.answers["navbar.position"]
+    if isValidAndNotEmpty(navPosition) and not isStringEqual(navPosition, m.initialNavPosition)
+        scene = m.top.getScene()
+        if isValid(scene)
+            overhang = scene.findNode("overhang")
+            sidebar = scene.findNode("sidebar")
+            if isStringEqual(navPosition, "left")
+                if isValid(overhang)
+                    overhang.visible = false
+                    overhang.isVisible = false
+                end if
+                if isValid(sidebar)
+                    sidebar.visible = true
+                    sidebar.callFunc("loadLibraries")
+                end if
+            else
+                if isValid(sidebar)
+                    sidebar.visible = false
+                end if
+                if isValid(overhang)
+                    overhang.visible = true
+                    overhang.isVisible = true
+                    overhang.callFunc("loadLibraries")
+                end if
+            end if
+            m.global.sceneManager.callFunc("refreshNavReference")
+            if m.global.hasField("navPositionChanged")
+                m.global.navPositionChanged = m.global.navPositionChanged + 1
+            end if
+        end if
+    end if
+end sub
+
+sub closeWizard()
+    m.top.wizardDone = true
+    if m.top.rerun then m.global.sceneManager.callFunc("popScene")
+end sub

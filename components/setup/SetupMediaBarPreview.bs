@@ -1,0 +1,126 @@
+import "pkg:/components/setup/setupPreviewDraw.bs"
+
+' A miniature home screen wearing one of the media bar styles, each drawn to
+' the real mode's geometry so the pick is made by looking rather than from a
+' name in a list.
+sub init()
+    redraw()
+end sub
+
+sub redraw()
+    while m.top.getChildCount() > 0
+        m.top.removeChildIndex(0)
+    end while
+
+    m.pal = setupPreviewDraw.Palette()
+    m.items = m.top.items
+    setupPreviewDraw.Rect(m.top, 0, 0, 1920, 1080, m.pal.background)
+
+    mode = m.top.mode
+    if isStringEqual(mode, "makd")
+        drawMakd()
+    else if isStringEqual(mode, "bookshelf")
+        drawBookshelf()
+    else if isStringEqual(mode, "gallery")
+        drawGallery()
+    else if isStringEqual(mode, "banner")
+        drawBanner()
+    else if isStringEqual(mode, "aya")
+        drawAya()
+    else if isStringEqual(mode, "off")
+        drawOff()
+    else
+        drawMoonfin()
+    end if
+end sub
+
+sub rowPeek(y as float, cardWidth as float, cardHeight as float, count as integer, startAt as integer)
+    setupPreviewDraw.Rect(m.top, 60, y, 300, 30, m.pal.onSurfaceDim)
+    setupPreviewDraw.PosterRow(m.top, m.items, 60, y + 48, cardWidth, cardHeight, 30, count, m.pal, startAt)
+end sub
+
+' The full screen hero with paging arrows floating on its edges
+sub drawMoonfin()
+    setupPreviewDraw.Hero(m.top, m.items, m.pal, 0)
+    setupPreviewDraw.Rect(m.top, 20, 505, 70, 70, "0x000000A0")
+    setupPreviewDraw.Icon(m.top, "pkg:/images/icons/chevron-left.png", 33, 518, 44, m.pal.onSurface)
+    setupPreviewDraw.Rect(m.top, 1830, 505, 70, 70, "0x000000A0")
+    setupPreviewDraw.Icon(m.top, "pkg:/images/icons/chevron-right.png", 1843, 518, 44, m.pal.onSurface)
+end sub
+
+' Full screen backdrop behind a dark scrim, with the text column on the left
+sub drawMakd()
+    backdrop = setupPreviewDraw.ItemField(m.items, 0, "backdropUrl")
+    setupPreviewDraw.Art(m.top, 0, 0, 1920, 1080, backdrop, m.pal.surfaceVariant)
+    setupPreviewDraw.Rect(m.top, 0, 0, 1920, 1080, "0x000000A3")
+    setupPreviewDraw.Logo(m.top, m.items, 0, 100, 140, 360, 140, m.pal.onSurface)
+    setupPreviewDraw.Rect(m.top, 100, 330, 452, 50, m.pal.onSurface)
+    for i = 0 to 2
+        setupPreviewDraw.Rect(m.top, 100 + i * 116, 410, 100, 34, m.pal.onSurfaceDim)
+    end for
+    for i = 0 to 3
+        setupPreviewDraw.Rect(m.top, 100, 486 + i * 40, 452 - i * 36, 20, m.pal.onSurfaceFaint)
+    end for
+    setupPreviewDraw.Rect(m.top, 100, 660, 200, 40, "0x00000080")
+    setupPreviewDraw.Dots(m.top, 200, 673, 5, 0, m.pal)
+end sub
+
+' The wooden shelf: current pick standing as a full poster beside a run of
+' colored book spines, on the real shelf palette
+sub drawBookshelf()
+    spineColors = ["0xBF441BFF", "0xae792dFF", "0xD98934FF", "0x870F19FF", "0x7A5334FF", "0x592B2BFF", "0x30A49CFF", "0x6C7851FF"]
+    setupPreviewDraw.Rect(m.top, 0, 0, 1920, 1080, "0x241812FF")
+    setupPreviewDraw.Rect(m.top, 0, 1005, 1920, 75, "0x140D08FF")
+    setupPreviewDraw.Rect(m.top, 566, 244, 34, 792, "0xC98F4EFF")
+    poster = setupPreviewDraw.ItemField(m.items, 0, "posterUrl")
+    setupPreviewDraw.Art(m.top, 600, 238, 560, 800, poster, m.pal.surfaceVariant)
+    for i = 0 to 8
+        x = 1270 + i * 70
+        setupPreviewDraw.Rect(m.top, x, 300, 62, 730, spineColors[i mod 8])
+        setupPreviewDraw.Rect(m.top, x + 16, 326, 30, 26, "0xFFFFFF59")
+        setupPreviewDraw.Rect(m.top, x + 25, 390, 12, 420, "0xFFFFFFD0")
+    end for
+end sub
+
+' One wide active backdrop with the rest queued as narrow slivers beside it
+sub drawGallery()
+    backdrop = setupPreviewDraw.ItemField(m.items, 0, "backdropUrl")
+    setupPreviewDraw.Art(m.top, 24, 150, 1478, 640, backdrop, m.pal.surfaceVariant)
+    for i = 0 to 3
+        x = 1510 + i * 100
+        sliver = setupPreviewDraw.ItemField(m.items, i + 1, "backdropUrl")
+        setupPreviewDraw.Art(m.top, x, 150, 92, 640, sliver, m.pal.surfaceVariant)
+        setupPreviewDraw.Rect(m.top, x + 26, 166, 40, 26, "0x000000A0")
+    end for
+    setupPreviewDraw.Dots(m.top, 960, 830, 5, 0, m.pal)
+    rowPeek(890, 100, 142, 15, 1)
+end sub
+
+' The wide rounded banner card up top with home rows under it
+sub drawBanner()
+    backdrop = setupPreviewDraw.ItemField(m.items, 0, "backdropUrl")
+    setupPreviewDraw.Art(m.top, 60, 130, 1800, 424, backdrop, m.pal.surfaceVariant)
+    setupPreviewDraw.Rect(m.top, 60, 414, 1800, 140, m.pal.scrim)
+    setupPreviewDraw.Logo(m.top, m.items, 0, 140, 340, 300, 90, m.pal.onSurface)
+    setupPreviewDraw.Rect(m.top, 140, 442, 360, 24, m.pal.onSurfaceDim)
+    setupPreviewDraw.Dots(m.top, 960, 590, 7, 3, m.pal)
+    rowPeek(650, 170, 255, 8, 1)
+end sub
+
+' The framed backdrop card with its page indicators in the top corner
+sub drawAya()
+    backdrop = setupPreviewDraw.ItemField(m.items, 0, "backdropUrl")
+    setupPreviewDraw.Art(m.top, 80, 150, 1760, 702, backdrop, m.pal.surfaceVariant)
+    setupPreviewDraw.Logo(m.top, m.items, 0, 124, 190, 340, 100, m.pal.onSurface)
+    setupPreviewDraw.Rect(m.top, 1756, 182, 24, 10, m.pal.onSurface)
+    setupPreviewDraw.Rect(m.top, 1788, 182, 12, 10, m.pal.onSurfaceFaint)
+    setupPreviewDraw.Rect(m.top, 1808, 182, 12, 10, m.pal.onSurfaceFaint)
+    rowPeek(890, 100, 142, 15, 1)
+end sub
+
+' No media bar at all, the rows start at the top of the screen
+sub drawOff()
+    for row = 0 to 2
+        rowPeek(50 + row * 350, 180, 255, 9, row * 2)
+    end for
+end sub

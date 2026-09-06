@@ -280,7 +280,7 @@ sub registerOverhangData(group)
     if not isValid(m.overhang) then return
 
     ' Hide overhang for login/setup screens only
-    if group.isSubType("SetServerScreen") or group.isSubType("UserSelect") or group.isSubType("SigninScene")
+    if group.isSubType("SetServerScreen") or group.isSubType("UserSelect") or group.isSubType("SigninScene") or group.isSubType("SetupWizard")
         setOverhangVisibility(false)
         return
     end if

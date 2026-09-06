@@ -1,0 +1,96 @@
+import "pkg:/components/setup/setupPreviewDraw.bs"
+
+' Miniature detail screens: classic keeps every detail on one page with the
+' poster up top, modern is the cinematic layout with its tab strip.
+sub init()
+    redraw()
+end sub
+
+sub redraw()
+    while m.top.getChildCount() > 0
+        m.top.removeChildIndex(0)
+    end while
+
+    pal = setupPreviewDraw.Palette()
+    items = m.top.items
+    setupPreviewDraw.Rect(m.top, 0, 0, 1920, 1080, pal.background)
+
+    if m.top.modern
+        ' Cinematic: full bleed art, scrims darkening the left and bottom, the
+        ' text block top left, buttons and the tab strip below
+        backdrop = setupPreviewDraw.ItemField(items, 0, "backdropUrl")
+        setupPreviewDraw.Art(m.top, 0, 0, 1920, 1080, backdrop, pal.surfaceVariant)
+        leftScrim = m.top.createChild("Poster")
+        leftScrim.width = 1400
+        leftScrim.height = 1080
+        leftScrim.loadDisplayMode = "scaleToFill"
+        leftScrim.blendColor = "0x000000"
+        leftScrim.uri = "pkg:/images/sidebar-edge-gradient.png"
+        setupPreviewDraw.Gradient(m.top, 0, 640, 1920, 440, 217)
+
+        setupPreviewDraw.Logo(m.top, items, 0, 96, 130, 500, 200, pal.onSurface)
+        for i = 0 to 3
+            setupPreviewDraw.Rect(m.top, 96 + i * 126, 380, 110, 40, pal.onSurfaceDim)
+        end for
+        setupPreviewDraw.Rect(m.top, 96, 452, 900, 22, pal.onSurfaceFaint)
+        setupPreviewDraw.Rect(m.top, 96, 486, 760, 22, pal.onSurfaceFaint)
+
+        drawButtonRow(pal, 96, 560)
+
+        for i = 0 to 3
+            color = pal.onSurfaceFaint
+            if i = 0 then color = pal.onSurface
+            setupPreviewDraw.Rect(m.top, 96 + i * 180, 980, 140, 30, color)
+        end for
+        setupPreviewDraw.Rect(m.top, 96, 1024, 140, 6, pal.accent)
+    else
+        ' One page over a dimmed backdrop: logo and facts down the left, the
+        ' rounded poster in the top right corner, the metadata card underneath
+        backdrop = setupPreviewDraw.ItemField(items, 0, "backdropUrl")
+        setupPreviewDraw.Art(m.top, 0, 0, 1920, 1080, backdrop, pal.surfaceVariant)
+        setupPreviewDraw.Rect(m.top, 0, 0, 1920, 1080, "0x000000C8")
+
+        poster = setupPreviewDraw.ItemField(items, 0, "posterUrl")
+        setupPreviewDraw.Art(m.top, 1585, 140, 239, 360, poster, pal.surfaceVariant)
+
+        setupPreviewDraw.Logo(m.top, items, 0, 96, 130, 507, 116, pal.onSurface)
+
+        setupPreviewDraw.Rect(m.top, 96, 282, 60, 22, pal.onSurfaceDim)
+        setupPreviewDraw.Rect(m.top, 180, 278, 64, 30, pal.onSurfaceFaint)
+        setupPreviewDraw.Rect(m.top, 268, 282, 70, 22, pal.onSurfaceDim)
+        setupPreviewDraw.Icon(m.top, "pkg:/images/sharp_star_white_18dp.png", 362, 280, 24, "0xFFD700FF")
+        setupPreviewDraw.Rect(m.top, 394, 282, 46, 22, pal.onSurfaceDim)
+        setupPreviewDraw.Icon(m.top, "pkg:/images/fresh.png", 464, 280, 24, "0xFFFFFFFF")
+        setupPreviewDraw.Rect(m.top, 496, 282, 46, 22, pal.onSurfaceDim)
+
+        setupPreviewDraw.Rect(m.top, 96, 344, 900, 22, pal.onSurfaceFaint)
+        setupPreviewDraw.Rect(m.top, 96, 378, 760, 22, pal.onSurfaceFaint)
+
+        ' The classic action row sits centered on the screen
+        drawButtonRow(pal, 662, 444)
+
+        setupPreviewDraw.Rect(m.top, 96, 570, 1728, 330, "0xFFFFFF0D")
+        for column = 0 to 2
+            x = 160 + column * 560
+            setupPreviewDraw.Rect(m.top, x, 614, 130, 20, pal.onSurfaceDim)
+            setupPreviewDraw.Rect(m.top, x, 662, 320, 18, pal.onSurfaceFaint)
+            setupPreviewDraw.Rect(m.top, x, 696, 260, 18, pal.onSurfaceFaint)
+        end for
+    end if
+end sub
+
+' The real action row: a play pill leading, then icon buttons beside it
+sub drawButtonRow(pal as object, x as float, y as float)
+    setupPreviewDraw.Rect(m.top, x, y, 220, 64, pal.accent)
+    setupPreviewDraw.Icon(m.top, "pkg:/images/icons/detail_play.png", x + 22, y + 14, 36, pal.onAccent)
+    setupPreviewDraw.Rect(m.top, x + 74, y + 22, 110, 20, pal.onAccent)
+
+    icons = ["heart.png", "check_white.png", "detail_trailer.png", "detail_shuffle.png"]
+    index = 0
+    for each icon in icons
+        bx = x + 244 + index * 92
+        setupPreviewDraw.Rect(m.top, bx, y, 76, 64, pal.onSurfaceFaint)
+        setupPreviewDraw.Icon(m.top, `pkg:/images/icons/${icon}`, bx + 22, y + 16, 32, pal.onSurfaceDim)
+        index++
+    end for
+end sub

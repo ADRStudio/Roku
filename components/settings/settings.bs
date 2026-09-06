@@ -1674,6 +1674,7 @@ function reorderSettingsForFlutter(configTree as object) as object
     shuffle = findSettingsChildByTitle(moonfinSettings, "Shuffle")
     supportMoonfin = findSettingsChildByTitle(moonfinSettings, "Support Moonfin")
     diagLogging = findSettingsChildByTitle(moonfinSettings, "Diagnostics")
+    runSetup = findSettingsChildByTitle(moonfinSettings, "Run Setup Again")
 
     general = findSettingsChildByTitle(userInterface, "General Style")
     libraries = findSettingsChildByTitle(userInterface, "Libraries")
@@ -1756,6 +1757,7 @@ function reorderSettingsForFlutter(configTree as object) as object
             type: ""
         }
     ]
+    pushSettingIfValid(aboutChildren, runSetup)
     pushSettingIfValid(aboutChildren, diagLogging)
     aboutChildren.push({ title: "Links", type: SettingType.SECTION })
     pushSettingIfValid(aboutChildren, supportMoonfin)
@@ -1770,7 +1772,7 @@ function reorderSettingsForFlutter(configTree as object) as object
 
     additionalChildren = []
 
-    moonfinMappedTitles = ["Navigation", "Home Screen", "Libraries", "Media Bar", "Theme Music", "Shuffle", "Support Moonfin", "Diagnostics"]
+    moonfinMappedTitles = ["Navigation", "Home Screen", "Libraries", "Media Bar", "Theme Music", "Shuffle", "Support Moonfin", "Diagnostics", "Run Setup Again"]
     pushUnmappedChildrenByTitle(additionalChildren, moonfinSettings, moonfinMappedTitles)
 
     pluginMappedTitles = ["Enable Plugin", "Settings Sync", "Metadata & Ratings", "Seerr", "External Lists"]
@@ -1963,6 +1965,15 @@ sub settingSelected()
     if isValid(selectedItem.settingName) and selectedItem.settingName = "moonfin.showWhatsNew"
         dismissPanel()
         m.global.sceneManager.callFunc("whatsNewDialog")
+        return
+    end if
+
+    if isValid(selectedItem.settingName) and selectedItem.settingName = "moonfin.runSetupWizard"
+        dismissPanel()
+        wizard = createObject("roSGNode", "SetupWizard")
+        ' A deliberate re-run asks every question again, answered or not
+        wizard.rerun = true
+        m.global.sceneManager.callFunc("pushScene", wizard)
         return
     end if
 
