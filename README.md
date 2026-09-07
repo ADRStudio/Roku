@@ -16,26 +16,21 @@
 
 > **[Back to main Moonfin project](https://github.com/Moonfin-Client)**
 
-Moonfin for Roku is an enhanced fork of the official Jellyfin Roku client, built for people who want the full Moonfin experience on Roku hardware. It shares its look, home screen, detail screens, settings tree, and vocabulary with the other Moonfin clients, and syncs your preferences through the Moonbase server plugin.
+Moonfin for Roku is an enhanced fork of the official Jellyfin Roku client. It brings the full Moonfin experience to Roku hardware. It shares its look, screens, and settings with the other Moonfin clients, and it syncs your preferences through the Moonbase server plugin.
 
 ## Features
 
-- **Modern home rows and a modern detail screen**, both on by default. The focused row item grows into a landscape card with metadata and ratings, and detail pages get a cinematic tabbed layout with studio logos, chapters, and an Up Next card. The classic layouts stay selectable.
-- **Themes** with built in Moonfin, Neon Pulse, and 8-Bit Hero looks, a community Theme Store, and server-shared themes, all synced across devices.
-- **A featured media bar with six styles**: Moonfin, MakD, Banner, Gallery, Bookshelf, and the rounded Aya hero, switchable instantly.
-- **A home screen full of rows**: Seerr trending and requests, IMDb and TMDB charts, Letterboxd and MDBList lists, Radarr and Sonarr calendars, Favorites, Collections, Genres, Playlists, Audio, Since You Watched, Rewatch, and per-library Recently Released, plus rows for a specific collection, genre, or playlist. Pick the ones you want in the row picker, order them however you like with no cap on how many, and the whole layout syncs.
-- **Seerr built into the detail screen**, with its rows and tabs sitting alongside everything else rather than in a screen of its own. Request in HD or 4K with smart season selection, track everything on the requests and issues screen, filter NSFW content, and get Seerr results in global search. See [Seerr Setup](https://github.com/Moonfin-Client/Roku/wiki/Seerr-Setup).
+- **A modern home screen and detail screen**, both on by default. The focused row item grows into a landscape card with metadata and ratings. Detail pages get a cinematic tabbed layout with studio logos, chapters, and an Up Next card. The classic layouts stay selectable.
+- **Themes**, with built-in Moonfin, Neon Pulse, and 8-Bit Hero looks, a community Theme Store, and server-shared themes. Your choice syncs across devices.
+- **A featured media bar** with six styles: Moonfin, MakD, Banner, Gallery, Bookshelf, and the rounded Aya hero.
+- **A home screen full of rows** you pick and order yourself, with no cap on how many. Choose from Seerr rows, IMDb and TMDB charts, Radarr and Sonarr calendars, Favorites, Collections, Genres, Playlists, Audio, Since You Watched, Rewatch, and Recently Released, plus rows for one specific collection, genre, or playlist. The whole layout syncs.
+- **Seerr built into the detail screen.** Request in HD or 4K with smart season selection, track your requests and issues, filter NSFW content, and get Seerr results in global search. See [Seerr Setup](https://github.com/Moonfin-Client/Roku/wiki/Seerr-Setup).
 - **Multi-server support** with seamless playback across every connected Jellyfin server.
-- **Settings sync** through the [Moonfin server plugin](https://github.com/Moonfin-Client/Plugin), covering your theme, layouts, row order, hidden Continue Watching and Next Up items, and much more.
-- **Playback done right**: trickplay previews while scrubbing, pre-playback track selection, default audio and subtitle languages synced with your server, multi-speed fast forward and rewind at 3x, 15x, and 50x, HDR10+ and Dolby Vision with fallbacks, manual subtitle sync, theme music, and  rearrangeable player buttons.
-- **A setup wizard on first run** that asks where you want the navigation bar, which media bar style you like, and whether you prefer classic or modern home rows and detail screens, with previews drawn from your own artwork, skipping anything you have already chosen.
-- **An in-app keyboard** used for every text field, with the letter rows following your language and accented characters on a held key.
-- **In-library search** so you can find something inside a big library without leaving it, plus a full sort and filter dialog.
-- **A shuffle dialog** with library, genre, and full-random shuffle showing five picks at a time.
-- **An account switcher** on the navigation bar avatar.
-- **In-app diagnostic logging** with a log viewer, and an option to send crash reports to your own server.
-- **A tabbed sign-in screen** with inline Quick Connect that's the default when your server supports it.
-- **Ratings that follow your sources**, including TMDB episode ratings, driven by the rating sources you pick in the plugin.
+- **Settings sync** through the [Moonfin server plugin](https://github.com/Moonfin-Client/Plugin). Your theme, layouts, row order, hidden items, and much more follow you between devices.
+- **Playback done right**: trickplay previews while scrubbing, pre-playback track selection, fast forward and rewind at 3x, 15x, and 50x, HDR10+ and Dolby Vision with fallbacks, manual subtitle sync, theme music, and rearrangeable player buttons.
+- **A setup wizard on first run** that shows live previews built from your own artwork, and skips anything you have already chosen.
+- **Ratings that follow your sources**, including TMDB episode ratings and extra sources like Letterboxd and MDBList through the plugin.
+- **Quality of life everywhere**: an in-app keyboard that follows your language, in-library search with a full sort and filter dialog, a shuffle dialog with five picks at a time, an account switcher on the navigation bar avatar, inline Quick Connect at sign-in, and in-app diagnostic logging with a log viewer.
 
 The full list is on the [Features](https://github.com/Moonfin-Client/Roku/wiki/Features) wiki page.
 
@@ -52,15 +47,20 @@ More in the [Screenshots](https://github.com/Moonfin-Client/Roku/wiki/Screenshot
 
 ## Installation
 
-**From the Roku Channel Store** is the easy route. Add [Moonfin](https://channelstore.roku.com/details/92a83c9f4112b76a7bcee3dc076254ca:3251a91bf7af7339652d5409ccfdcb39/moonfin) to your account and it installs on your devices, updating itself from then on.
-
-**Sideloading** gets you the newest build before it reaches the store. Download the latest `.zip` from the [Releases page](https://github.com/Moonfin-Client/Roku/releases) and install it through Roku Developer Mode.
+**The easy way:** add [Moonfin](https://channelstore.roku.com/details/92a83c9f4112b76a7bcee3dc076254ca:3251a91bf7af7339652d5409ccfdcb39/moonfin) from the Roku Channel Store. It installs on your devices and updates itself from then on.
 
 Moonfin needs Roku OS 9.1 or newer, which covers most Roku devices from 2018 onwards.
 
-Step-by-step sideloading instructions are on [Installation and Sideloading](https://github.com/Moonfin-Client/Roku/wiki/Installation-and-Sideloading).
+Seerr is optional. It connects through the [Moonfin server plugin](https://github.com/Moonfin-Client/Plugin), so there is nothing to type on the Roku. See [Seerr Setup](https://github.com/Moonfin-Client/Roku/wiki/Seerr-Setup).
 
-Seerr is optional and connects through the [Moonfin server plugin](https://github.com/Moonfin-Client/Plugin), so there's nothing to type on the Roku. See [Seerr Setup](https://github.com/Moonfin-Client/Roku/wiki/Seerr-Setup).
+<details>
+<summary><b>Advanced:</b> sideloading the newest build</summary>
+
+Sideloading gets you the newest build before it reaches the store. Download the latest `.zip` from the [Releases page](https://github.com/Moonfin-Client/Roku/releases) and install it through Roku Developer Mode.
+
+Step-by-step instructions are on [Installation and Sideloading](https://github.com/Moonfin-Client/Roku/wiki/Installation-and-Sideloading).
+
+</details>
 
 ## Building
 
@@ -71,7 +71,7 @@ npm install
 npm run build
 ```
 
-Node.js 16+ and npm are the only prerequisites. The output lands in `out/moonfin-roku-v{version}.zip`. Full details are on [Building from Source](https://github.com/Moonfin-Client/Roku/wiki/Building-from-Source).
+Node.js and npm are the only prerequisites. The output lands in `out/moonfin-roku-v{version}.zip`. Full details are on [Building from Source](https://github.com/Moonfin-Client/Roku/wiki/Building-from-Source).
 
 ## Documentation
 
@@ -87,7 +87,7 @@ The deeper reference material lives in the [Wiki](https://github.com/Moonfin-Cli
 
 ## Contributing
 
-Contributions are welcome. Check the existing issues first, open an issue before starting a large change, match the existing code style (enforced by `bsfmt.json`), and test on real Roku hardware where you can. Features that would help all Jellyfin users are worth proposing upstream first.
+Contributions are welcome. Check the existing issues first, and open an issue before starting a large change. Match the existing code style, which `bsfmt.json` enforces, and test on real Roku hardware where you can. Features that would help all Jellyfin users are worth proposing upstream first.
 
 To submit a change, fork the repo, create a feature branch, make your changes with clear commit messages, and open a pull request with a clear description.
 
