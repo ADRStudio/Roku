@@ -1605,8 +1605,16 @@ sub onMyListLoaded()
 end sub
 
 sub reclaimResources()
-    m.loadItemsTask.control = TaskControl.STOP
-    m.loadItemsTask.content = []
+    ' Stopping a task blocks the render thread until the task returns, and a request
+    ' in flight is long enough for the watchdog to kill the channel. A running one is
+    ' let go of instead, since every caller pops the scene straight after.
+    if isValid(m.loadItemsTask)
+        m.loadItemsTask.unobserveField("content")
+        if not isStringEqual(m.loadItemsTask.state, "run")
+            m.loadItemsTask.control = TaskControl.STOP
+        end if
+        m.loadItemsTask.content = []
+    end if
 
     resetLoadedItems()
 

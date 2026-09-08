@@ -192,7 +192,9 @@ namespace session
             end if
 
             reg = CreateObject("roRegistrySection", tmpSession.user.id)
-            reg.write("serverId", m.global.session.server.id)
+            if isValid(m.global.session.server.id)
+                reg.write("serverId", m.global.session.server.id)
+            end if
             if isValid(m.global.session.server.url)
                 reg.write("serverUrl", LCase(m.global.session.server.url))
             end if

@@ -2147,13 +2147,18 @@ sub itemSelected()
     m.selectedRowItem = m.top.rowItemSelected
     ' Force field change notification even for same item by clearing first
     m.top.selectedItem = invalid
-    m.top.selectedItem = m.top.content.getChild(m.top.rowItemSelected[0]).getChild(m.top.rowItemSelected[1])
+    m.top.selectedItem = getRowListItemAt(m.top, m.top.rowItemSelected)
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if press
+        ' The focus position is empty until the rows have content and something is
+        ' focused, so an empty one reads as off the grid
+        focused = m.top.rowItemFocused
+        if not isValid(focused) or focused.count() < 2 then focused = [-1, -1]
+
         if key = KeyCode.PLAY
-            itemToPlay = m.top.content.getChild(m.top.rowItemFocused[0]).getChild(m.top.rowItemFocused[1])
+            itemToPlay = getRowListItemAt(m.top, focused)
             ' Online recommendation cards arent local items, so they cant quick play
             if isValid(itemToPlay) and isValid(itemToPlay.json) and isValid(itemToPlay.json.SeerrItem)
                 return true
@@ -2165,16 +2170,17 @@ function onKeyEvent(key as string, press as boolean) as boolean
         end if
 
         if key = KeyCode.UP
-            if m.top.rowItemFocused[0] = 0
+            if focused[0] = 0
                 return false
             end if
         end if
 
         ' Keep the focus card up when the press cannot move focus, so it only hides on a real move
-        rows = m.top.content.getChildren(-1, 0)
-        currentRow = m.top.rowItemFocused[0]
+        rows = []
+        if isValid(m.top.content) then rows = m.top.content.getChildren(-1, 0)
+        currentRow = focused[0]
         if currentRow >= 0 and currentRow < rows.count()
-            currentCol = m.top.rowItemFocused[1]
+            currentCol = focused[1]
             atBottom = (currentRow = rows.count() - 1) and (key = KeyCode.DOWN)
             atRight = (currentCol = rows[currentRow].getChildCount() - 1) and (key = KeyCode.RIGHT)
             atLeft = (currentCol = 0) and (key = KeyCode.LEFT)

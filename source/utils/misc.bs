@@ -1061,6 +1061,19 @@ function getItemGridFocusedItem(itemGrid as object) as dynamic
     return itemGrid.content.getChild(itemGrid.itemFocused)
 end function
 
+' The node at a RowList's focused or selected position. The position is empty until
+' the list has content and focus, and stays behind when the rows are rebuilt.
+function getRowListItemAt(rowList as object, position as object) as dynamic
+    if not isValid(rowList) or not isValid(rowList.content) then return invalid
+    if not isValid(position) or position.count() < 2 then return invalid
+    if position[0] < 0 or position[1] < 0 then return invalid
+
+    row = rowList.content.getChild(position[0])
+    if not isValid(row) then return invalid
+
+    return row.getChild(position[1])
+end function
+
 ' Handles section navigation escape key logic for detail screens with sections
 ' This is a common pattern in screens like ArtistView with multiple scrollable sections
 ' Parameters:

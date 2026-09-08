@@ -85,6 +85,8 @@ function APIRequest(url as string, params = {} as object) as dynamic
     if full_url = invalid then return invalid
 
     req = CreateObject("roUrlTransfer")
+    if not isValid(req) then return invalid
+
     req.setUrl(full_url)
     req = authRequest(req)
     ' SSL cert
@@ -550,6 +552,8 @@ function APIRequestForServer(serverUrl as string, userId as string, authToken as
     if full_url = "" then return invalid
 
     req = CreateObject("roUrlTransfer")
+    if not isValid(req) then return invalid
+
     req.setUrl(full_url)
 
     serverData = {

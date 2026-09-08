@@ -505,7 +505,7 @@ sub addRowSize(newRow)
 end sub
 
 sub onRowItemSelected()
-    selectedItem = m.top.content.getChild(m.top.rowItemSelected[0]).getChild(m.top.rowItemSelected[1])
+    selectedItem = getRowListItemAt(m.top, m.top.rowItemSelected)
 
     if isValid(selectedItem)
         if isValid(selectedItem.json)
@@ -520,6 +520,6 @@ sub onRowItemSelected()
 end sub
 
 sub onRowItemFocused()
-    focusedItem = m.top.content.getChild(m.top.rowItemFocused[0]).getChild(m.top.rowItemFocused[1])
+    focusedItem = getRowListItemAt(m.top, m.top.rowItemFocused)
     m.top.focusedItem = focusedItem
 end sub

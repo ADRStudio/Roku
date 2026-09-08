@@ -849,7 +849,7 @@ sub onMyListLoaded()
 
     if not isValidAndNotEmpty(isInMyListData) then return
 
-    focusedItem = m.homeRows.content.getChild(m.homeRows.rowItemFocused[0]).getChild(m.homeRows.rowItemFocused[1])
+    focusedItem = getRowListItemAt(m.homeRows, m.homeRows.rowItemFocused)
     if not isValid(focusedItem) then return
 
     dialogData = []
@@ -1016,7 +1016,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
 
     if isStringEqual(key, KeyCode.OPTIONS)
         if m.homeRows.hasFocus()
-            focusedItem = m.homeRows.content.getChild(m.homeRows.rowItemFocused[0]).getChild(m.homeRows.rowItemFocused[1])
+            focusedItem = getRowListItemAt(m.homeRows, m.homeRows.rowItemFocused)
             if not isValidAndNotEmpty(focusedItem) then return false
 
             m.loadMetaDataTask.itemId = focusedItem.LookupCI("id")
@@ -1043,7 +1043,8 @@ sub onMetaDataLoaded()
 
     m.favoritesOptionText = chainLookupReturn(data, "json.UserData.IsFavorite", false) ? tr("Remove From Favorites") : tr("Add To Favorites")
 
-    focusedItem = m.homeRows.content.getChild(m.homeRows.rowItemFocused[0]).getChild(m.homeRows.rowItemFocused[1])
+    focusedItem = getRowListItemAt(m.homeRows, m.homeRows.rowItemFocused)
+    if not isValid(focusedItem) then return
 
     m.loadItemsTask1.itemId = focusedItem.LookupCI("id")
     m.loadItemsTask1.control = TaskControl.RUN

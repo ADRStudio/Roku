@@ -130,7 +130,7 @@ end sub
 
 'Genre Item Selected
 sub onGenreItemSelected()
-    m.top.selectedItem = m.genreList.content.getChild(m.genreList.rowItemSelected[0]).getChild(m.genreList.rowItemSelected[1])
+    m.top.selectedItem = getRowListItemAt(m.genreList, m.genreList.rowItemSelected)
 end sub
 
 sub alphaSelectedChanged()
@@ -774,8 +774,8 @@ function getItemFocused()
         return getItemGridFocusedItem(m.itemGrid)
     end if
 
-    if m.genreList.isinFocusChain() and isValid(m.genreList.rowItemFocused)
-        return m.genreList.content.getChild(m.genreList.rowItemFocused[0]).getChild(m.genreList.rowItemFocused[1])
+    if m.genreList.isinFocusChain()
+        return getRowListItemAt(m.genreList, m.genreList.rowItemFocused)
     end if
 
     return invalid

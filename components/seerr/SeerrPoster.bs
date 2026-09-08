@@ -18,6 +18,9 @@ sub init()
 end sub
 
 sub itemContentChanged()
+    ' A row can hand a poster its content before the poster's own init has run
+    if not isValid(m.normalWidth) then init()
+
     itemData = m.top.itemContent
 
     if not isValid(itemData) then return
@@ -105,6 +108,8 @@ sub itemContentChanged()
 end sub
 
 sub focusChanged()
+    if not isValid(m.normalWidth) then init()
+
     ' Enable/disable scrolling text
     m.title.repeatCount = m.top.itemHasFocus ? - 1 : 0
 end sub

@@ -1092,7 +1092,9 @@ end sub
 sub itemContentChanged()
     item = m.top.itemContent
 
-    if isValid(m.extrasGrid)
+    ' The item type is a separate field, so it can say episode or series while the
+    ' content read here has not arrived yet
+    if isValid(item) and isValid(m.extrasGrid)
         if isEpisode()
             m.extrasGrid.seasonID = item.seasonID
             m.extrasGrid.showID = item.showID

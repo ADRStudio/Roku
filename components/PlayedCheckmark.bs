@@ -18,6 +18,9 @@ sub init()
 end sub
 
 sub onSizeChange()
+    ' A card can set this node's fields before the node's own init has run
+    if not isValid(m.background) then init()
+
     w = m.top.width
     h = m.top.height
     m.background.width = w
@@ -37,6 +40,8 @@ function watchedIndicatorMode() as string
 end function
 
 sub onDataChange()
+    if not isValid(m.background) then init()
+
     m.background.visible = false
 
     if isValid(m.checkmark)

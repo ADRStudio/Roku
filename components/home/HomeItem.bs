@@ -133,6 +133,9 @@ sub initItemIcon()
 end sub
 
 sub itemContentChanged()
+    ' A row can hand a card its content before the card's own init has run
+    if not isValid(m.initCooldownPeriod) then init()
+
     itemData = m.top.itemContent
 
     if not isValid(itemData) then return
@@ -477,6 +480,8 @@ end sub
 '
 ' Enable title scrolling based on item Focus
 sub focusChanged()
+    if not isValid(m.initCooldownPeriod) then init()
+
     currentTime = UpTime(0)
 
     ' Block ALL animations during initialization cooldown
