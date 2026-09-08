@@ -9,12 +9,10 @@ import "pkg:/source/utils/multiserver.bs"
 
 namespace MainAction
     sub onPlayButtonClicked(activeScene as object)
+        if not isValid(activeScene) or not isValid(activeScene.itemContent) then return
+
         startLoadingSpinner()
         activeScene.itemContent.id = chainLookup(activeScene, "selectedVideoStreamId")
-
-        if isValid(activeScene.itemContent) and isValid(activeScene.itemContent.json)
-        else
-        end if
 
         ' Check if a specific Audio Stream was selected
         activeScene.itemContent.selectedAudioStreamIndex = chainLookup(activeScene, "selectedAudioStreamIndex") ?? 0

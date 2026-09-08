@@ -1149,13 +1149,21 @@ end sub
 
 sub onItemFocusChanged()
     if not isValid(m.homeRows.content) then return
-    if m.homeRows.rowItemFocused[0] < 0 or m.homeRows.rowItemFocused[1] < 0 then return
 
-    focusedItem = m.homeRows.content.getChild(m.homeRows.rowItemFocused[0]).getChild(m.homeRows.rowItemFocused[1])
+    ' The focus position is gone while the rows are being rebuilt, and the row it
+    ' points at can be gone before this runs
+    focused = m.homeRows.rowItemFocused
+    if not isValid(focused) or focused.count() < 2 then return
+    if focused[0] < 0 or focused[1] < 0 then return
+
+    focusedRow = m.homeRows.content.getChild(focused[0])
+    if not isValid(focusedRow) then return
+
+    focusedItem = focusedRow.getChild(focused[1])
     if not isValid(focusedItem) then return
 
     if m.modernHomeRows
-        applyModernReflow(m.homeRows.rowItemFocused[0], m.homeRows.rowItemFocused[1])
+        applyModernReflow(focused[0], focused[1])
         showModernFocusCard(focusedItem)
     end if
 

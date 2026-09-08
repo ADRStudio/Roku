@@ -71,17 +71,27 @@ sub unset_setting(key)
     registry_delete(key, "Jellyfin")
 end sub
 
+' The session is built during sign in, so anything reaching these accessors before
+' that, or after a sign out, finds no user to read against. Checking here lets them
+' bail out instead of walking a chain that isnt there yet.
+function current_user_id() as dynamic
+    if not isValid(m.global) or not isValid(m.global.session) then return invalid
+    if not isValid(m.global.session.user) then return invalid
+    return m.global.session.user.id
+end function
+
 ' User registry accessors for the currently active user
 function get_user_setting(key as string) as dynamic
-    if key = "" or m.global.session.user.id = invalid then return invalid
-    value = registry_read(key, m.global.session.user.id)
-    return value
+    userId = current_user_id()
+    if key = "" or not isValid(userId) then return invalid
+    return registry_read(key, userId)
 end function
 
 ' Read a user setting as a boolean, falling back to defaultValue when it is unset or unreadable.
 ' Values reach the session as real booleans from settings.json defaults and as "true"/"false"
 ' strings from a plugin sync, so both spellings have to be accepted.
 function get_user_setting_bool(key as string, defaultValue as boolean) as boolean
+    if not isValid(current_user_id()) then return defaultValue
     value = toBoolean(session.user.settings.Read(key))
 
     valueType = LCase(Type(value))
@@ -91,15 +101,17 @@ function get_user_setting_bool(key as string, defaultValue as boolean) as boolea
 end function
 
 sub set_user_setting(key as string, value as dynamic)
-    if m.global.session.user.id = invalid then return
+    userId = current_user_id()
+    if not isValid(userId) then return
     session.user.settings.Save(key, value)
-    registry_write(key, value, m.global.session.user.id)
+    registry_write(key, value, userId)
 end sub
 
 sub unset_user_setting(key as string)
-    if m.global.session.user.id = invalid then return
+    userId = current_user_id()
+    if not isValid(userId) then return
     session.user.settings.Delete(key)
-    registry_delete(key, m.global.session.user.id)
+    registry_delete(key, userId)
 end sub
 
 ' Recursivly search the config tree for entry with settingname equal to key

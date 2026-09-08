@@ -73,7 +73,7 @@ sub setData()
         imgParams.Append({ "maxHeight": 261 })
         imgParams.Append({ "maxWidth": 464 })
 
-        if datum.ImageTags.Primary <> invalid
+        if isValid(datum.ImageTags) and datum.ImageTags.Primary <> invalid
             param = { "Tag": datum.ImageTags.Primary }
             imgParams.Append(param)
         end if
@@ -95,7 +95,7 @@ sub setData()
         else if datum.ParentBackdropImageTags <> invalid and isValidAndNotEmpty(datum.ParentBackdropItemId)
             imgParams["Tag"] = datum.ParentBackdropImageTags[0]
             m.top.widePosterUrl = getImageURL(datum.ParentBackdropItemId, "Backdrop", imgParams, serverData)
-        else if datum.ImageTags.Primary <> invalid
+        else if isValid(datum.ImageTags) and datum.ImageTags.Primary <> invalid
             imgParams["Tag"] = datum.SeriesPrimaryImageTag
             m.top.widePosterUrl = getImageURL(datum.LookupCI("Id"), "Primary", imgParams, serverData)
         end if
@@ -135,7 +135,7 @@ sub setData()
         imgParams.Append({ "maxHeight": 270 })
         imgParams.Append({ "maxWidth": 180 })
 
-        if datum.ImageTags.Primary <> invalid
+        if isValid(datum.ImageTags) and datum.ImageTags.Primary <> invalid
             param = { "Tag": datum.ImageTags.Primary }
             imgParams.Append(param)
         end if
@@ -149,7 +149,7 @@ sub setData()
         if datum.ImageTags <> invalid and datum.imageTags.Thumb <> invalid
             imgParams["Tag"] = datum.imageTags.Thumb
             m.top.thumbnailUrl = getImageURL(datum.LookupCI("Id"), "Thumb", imgParams, serverData)
-        else if datum.BackdropImageTags[0] <> invalid
+        else if isValid(datum.BackdropImageTags) and datum.BackdropImageTags.count() > 0
             imgParams["Tag"] = datum.BackdropImageTags[0]
             m.top.thumbnailUrl = getImageURL(datum.LookupCI("Id"), "Backdrop", imgParams, serverData)
         end if
