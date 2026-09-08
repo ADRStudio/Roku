@@ -18,6 +18,7 @@ sub init()
 
     m.results = []
     m.applied = false
+    m.keyboard = invalid
 
     m.searchTask = CreateObject("roSGNode", "JellyfinAPITask")
     m.applyTask = CreateObject("roSGNode", "JellyfinAPITask")
@@ -230,6 +231,10 @@ end sub
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
     if not m.top.visible then return false
+
+    ' The press that opens the keyboard carries on to here afterwards, so without this
+    ' the panel would take focus straight back off the keyboard it just opened
+    if isValid(m.keyboard) then return false
 
     if key = KeyCode.BACK
         if m.view = "menu"
