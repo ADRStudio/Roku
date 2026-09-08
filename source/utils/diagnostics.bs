@@ -74,6 +74,12 @@ namespace diagnostics
     ' Keys are lowercase because an assocarray crossing a node field arrives that way, and
     ' matching it here means the entry the viewer reads is the entry that was written
     sub Log(category as string, level as string, message as string)
+        ' A warning or an error is the line someone reading a console log came for, and
+        ' they are rare enough to print whether or not the log is switched on
+        if level = diagnostics.LEVEL_WARN or level = diagnostics.LEVEL_ERROR
+            print "[Moonfin " + category + "] " + level + ": " + message
+        end if
+
         if not diagnostics.IsOn() then return
         if not isValid(m.global) or not isValid(m.global.diagLog) then return
 

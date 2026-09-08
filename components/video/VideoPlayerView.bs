@@ -827,6 +827,33 @@ sub showPlaybackErrorDialog(errorMessage as string)
     m.top.getScene().dialog = dialog
 end sub
 
+' Restart the stream we already have, which clears a passing hiccup without the
+' cost of asking the server again
+sub retryPlaybackInPlace()
+    currentPosition = m.top.position
+    m.top.control = VideoControl.STOP
+    m.top.seek = currentPosition
+    m.top.control = VideoControl.PLAY
+end sub
+
+' Ask the server for playback again from where we are, the way picking the item
+' off the detail screen does. A stream the server has already torn down cant be
+' brought back by restarting the same URL, which is why replaying by hand works
+' when the in place retry does not.
+sub retryPlaybackFromServer()
+    if m.top.position > 0
+        m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
+    end if
+
+    m.top.control = VideoControl.STOP
+
+    m.LoadMetaDataTask.selectedSubtitleIndex = m.top.SelectedSubtitle
+    m.LoadMetaDataTask.selectedAudioStreamIndex = m.top.audioIndex
+    m.LoadMetaDataTask.itemId = m.top.id
+    m.LoadMetaDataTask.observeField("content", "onVideoContentLoaded")
+    m.LoadMetaDataTask.control = TaskControl.RUN
+end sub
+
 sub onVideoContentLoaded()
     m.LoadMetaDataTask.unobserveField("content")
     m.LoadMetaDataTask.control = TaskControl.STOP
@@ -1497,6 +1524,11 @@ sub onState()
 
     ' When buffering, start timer to monitor buffering process
     if isStringEqual(m.top.state, MediaPlaybackState.BUFFERING) and m.bufferCheckTimer <> invalid
+        ' Roku reports the fill of the buffer it is filling now, so the mark to beat
+        ' starts again with it. Carrying the old one over made every later buffer
+        ' look stalled the moment the check ran.
+        m.bufferPercentage = 0
+
         ' start timer
         m.bufferCheckTimer.control = "start"
         m.bufferCheckTimer.ObserveField("fire", "bufferCheck")
@@ -1539,12 +1571,14 @@ sub onState()
             if m.playbackRetries < REPLAY_RETRIES
                 m.playbackRetries = m.playbackRetries + 1
                 m.lastBufferError = currentTime
-                diagnostics.Playback(`Player error, retry ${m.playbackRetries} of ${REPLAY_RETRIES}`, diagnostics.LEVEL_WARN)
-                ' Stop and restart playback from current position
-                currentPosition = m.top.position
-                m.top.control = VideoControl.STOP
-                m.top.seek = currentPosition
-                m.top.control = VideoControl.PLAY
+
+                if m.playbackRetries = 1
+                    diagnostics.Playback(`Player error, restarting the stream, retry ${m.playbackRetries} of ${REPLAY_RETRIES}`, diagnostics.LEVEL_WARN)
+                    retryPlaybackInPlace()
+                else
+                    diagnostics.Playback(`Player error, asking the server for playback again, retry ${m.playbackRetries} of ${REPLAY_RETRIES}`, diagnostics.LEVEL_WARN)
+                    retryPlaybackFromServer()
+                end if
             else
                 ' All retries exhausted, show error and exit
                 diagnostics.Playback(`Playback failed after ${REPLAY_RETRIES} retries`, diagnostics.LEVEL_ERROR)
@@ -1778,16 +1812,17 @@ sub bufferCheck()
             if m.playbackRetries < REPLAY_RETRIES
                 m.playbackRetries = m.playbackRetries + 1
                 m.lastBufferError = currentTime
-                diagnostics.Playback(`Buffering stalled, retry ${m.playbackRetries} of ${REPLAY_RETRIES}`, diagnostics.LEVEL_WARN)
 
                 ' Extend buffer check duration for subsequent retries to allow more time
                 m.bufferCheckTimer.duration = 30 + (m.playbackRetries * 15)
 
-                ' Stop and restart playback from current position
-                currentPosition = m.top.position
-                m.top.control = VideoControl.STOP
-                m.top.seek = currentPosition
-                m.top.control = VideoControl.PLAY
+                if m.playbackRetries = 1
+                    diagnostics.Playback(`Buffering stalled, restarting the stream, retry ${m.playbackRetries} of ${REPLAY_RETRIES}`, diagnostics.LEVEL_WARN)
+                    retryPlaybackInPlace()
+                else
+                    diagnostics.Playback(`Buffering stalled, asking the server for playback again, retry ${m.playbackRetries} of ${REPLAY_RETRIES}`, diagnostics.LEVEL_WARN)
+                    retryPlaybackFromServer()
+                end if
             else
                 ' All retries exhausted, show error
                 diagnostics.Playback(`Buffering failed after ${REPLAY_RETRIES} retries`, diagnostics.LEVEL_ERROR)
