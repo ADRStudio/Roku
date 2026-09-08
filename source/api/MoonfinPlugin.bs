@@ -14,6 +14,15 @@ namespace moonfinPlugin
         return normalizeKeys(result)
     end function
 
+    ' The messages the admin wrote for this user. The server decides who sees
+    ' what, so whatever comes back is theirs to read.
+    function Messages() as object
+        req = APIRequest("/Moonfin/Messages")
+        if not isValid(req) then return invalid
+
+        return getJson(req)
+    end function
+
     ' What the server calls its Seerr instance, so a fork is named as it is configured
     function SeerrDisplayName() as string
         req = APIRequest("/Moonfin/Seerr/Config")

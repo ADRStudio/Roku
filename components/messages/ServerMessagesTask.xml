@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Asks the plugin for this user's messages, off the render thread -->
+<component name="ServerMessagesTask" extends="Task">
+    <interface>
+        <!-- The parsed list, empty when the server could not be reached -->
+        <field id="serverMessagesLoaded" type="array" alwaysNotify="true" />
+        <!-- False when the server was unreachable, so the cache is kept as it is -->
+        <field id="reached" type="boolean" value="false" />
+    </interface>
+</component>

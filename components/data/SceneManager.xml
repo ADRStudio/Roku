@@ -10,6 +10,7 @@
     <function name="userMessage" />
     <function name="standardDialog" />
     <function name="whatsNewDialog" />
+    <function name="serverMessagesDialog" />
     <function name="radioDialog" />
     <function name="dismissDialog" />
     <function name="isDialogOpen" />

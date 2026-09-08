@@ -1,0 +1,49 @@
+' A small red circle with a count on the corner of a nav icon. Counts above nine
+' show as 9+ so the circle stays small enough to sit on one, and a count of zero
+' draws nothing. The item carries its own badge nodes so they are built once.
+namespace unreadBadge
+
+    const SIZE = 22
+    const TEXT_SIZE = 14
+    const INK = "#E03B36"
+
+    sub Apply(item as object, iconSize as integer, count as integer)
+        if not isValid(item) then return
+
+        if not isValid(item.badge)
+            circle = item.btn.createChild("Poster")
+            circle.uri = "pkg:/images/icons/circle.png"
+            circle.blendColor = unreadBadge.INK
+            circle.height = unreadBadge.SIZE
+
+            caption = item.btn.createChild("Label")
+            caption.font = "font:SmallestBoldSystemFont"
+            caption.font.size = unreadBadge.TEXT_SIZE
+            caption.color = "#FFFFFF"
+            caption.height = unreadBadge.SIZE
+            caption.horizAlign = "center"
+            caption.vertAlign = "center"
+
+            item.badge = circle
+            item.badgeLabel = caption
+        end if
+
+        item.badge.visible = count > 0
+        item.badgeLabel.visible = count > 0
+        if count = 0 then return
+
+        text = count.toStr()
+        if count > 9 then text = "9+"
+        item.badgeLabel.text = text
+
+        width = unreadBadge.SIZE
+        if Len(text) > 1 then width = unreadBadge.SIZE + 10
+        item.badge.width = width
+        item.badgeLabel.width = width
+
+        left = item.icon.translation[0] + iconSize - width + 10
+        top = item.icon.translation[1] - 6
+        item.badge.translation = [left, top]
+        item.badgeLabel.translation = [left, top]
+    end sub
+end namespace

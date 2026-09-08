@@ -247,6 +247,8 @@ namespace session
                     mdblistAvailable: result.mdblistAvailable ?? false,
                     tmdbAvailable: result.tmdbAvailable ?? false,
                     seerrEnabled: result.seerrEnabled ?? false,
+                    ' Older plugins leave this out, which reads as false and hides the button
+                    messagesSupported: result.messagesSupported ?? false,
                     defaultSettings: result.defaultSettings ?? invalid
                 }
 

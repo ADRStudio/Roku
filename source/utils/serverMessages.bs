@@ -1,0 +1,261 @@
+import "pkg:/source/api/MoonfinPlugin.bs"
+import "pkg:/source/utils/config.bs"
+import "pkg:/source/utils/misc.bs"
+
+' The admin messages for the server this user is signed in to, and which ones
+' they have already read.
+'
+' Messages are cached, so the list still opens with no connection and a message
+' posted while the app was closed is there on the next launch. The live event
+' only reaches clients that are running.
+namespace serverMessages
+
+    ' The colour the admin picked, as drawn in the app. Fixed values rather than
+    ' theme tokens, so a message marked blue looks blue on every theme.
+    function Palette() as object
+        return {
+            green: "#4CAF6D",
+            red: "#E05260",
+            yellow: "#E0B040",
+            blue: "#4A9EE0",
+            white: "#E8EAED"
+        }
+    end function
+
+    function ColorFor(name as string) as string
+        colors = serverMessages.Palette()
+        if colors.DoesExist(name) then return colors[name]
+        return colors.white
+    end function
+
+    ' The address as sent when it is a web link, otherwise empty. The body and
+    ' the action come from the admin as free text and end up on the viewer's
+    ' phone, so anything that is not http or https is dropped rather than shown.
+    function WebLink(raw as dynamic) as string
+        if not isValidAndNotEmpty(raw) then return ""
+
+        trimmed = raw.Trim()
+        if trimmed = "" then return ""
+
+        spaces = CreateObject("roRegex", "\s", "")
+        if spaces.IsMatch(trimmed) then return ""
+
+        ' Only a host that reads as one. A bracketed host is an IPv6 address.
+        address = CreateObject("roRegex", "^https?://(?:[a-z0-9\-._~%]+|\[[0-9a-f:.]+\])(?::\d+)?(?:[/?#]|$)", "i")
+        if not address.IsMatch(trimmed) then return ""
+
+        return trimmed
+    end function
+
+    ' A key the admin left out reads as nothing rather than throwing
+    function textOf(value as dynamic) as string
+        if not isValid(value) then return ""
+        if type(value) = "roString" or type(value) = "String" then return value
+        return ""
+    end function
+
+    function ParseOne(entry as object) as object
+        if not isValid(entry) then return invalid
+
+        ' Keys arrive capitalised from Emby, so they are read either way
+        json = moonfinPlugin.normalizeKeys(entry)
+        if not isValid(json) then return invalid
+
+        id = serverMessages.textOf(json.id).Trim()
+        if id = "" then return invalid
+
+        title = serverMessages.textOf(json.title).Trim()
+        body = serverMessages.textOf(json.body).Trim()
+        if title = "" and body = "" then return invalid
+
+        color = LCase(serverMessages.textOf(json.color).Trim())
+        if not serverMessages.Palette().DoesExist(color) then color = "white"
+
+        delivery = "inbox"
+        if LCase(serverMessages.textOf(json.delivery).Trim()) = "popup" then delivery = "popup"
+
+        return {
+            id: id,
+            title: title,
+            body: body,
+            color: color,
+            delivery: delivery,
+            actionLabel: serverMessages.textOf(json.actionLabel).Trim(),
+            actionUrl: serverMessages.WebLink(serverMessages.textOf(json.actionUrl)),
+            createdUtc: serverMessages.textOf(json.createdUtc).Trim()
+        }
+    end function
+
+    ' The list the plugin sends, or the cached copy of it, in the order the admin
+    ' arranged. Anything that does not read as a message is skipped.
+    function ParseList(payload as dynamic) as object
+        list = []
+        if not isValid(payload) then return list
+
+        raw = payload
+        if type(raw) <> "roArray"
+            raw = payload.items
+            if not isValid(raw) then raw = payload.Items
+        end if
+        if not isValid(raw) or type(raw) <> "roArray" then return list
+
+        for each entry in raw
+            parsed = serverMessages.ParseOne(entry)
+            if isValid(parsed) then list.push(parsed)
+        end for
+
+        return list
+    end function
+
+    function HasAction(message as object) as boolean
+        if not isValid(message) then return false
+        return isValidAndNotEmpty(message.actionUrl) and isValidAndNotEmpty(message.actionLabel)
+    end function
+
+    ' One scope per server and user, so messages read on one server do not look
+    ' read on another, and the next viewer does not inherit this one's. The read
+    ' ids already sit in the signed in user's own registry section, so the key
+    ' only has to carry the server.
+    function ScopeKey() as string
+        serverId = toString(chainLookupReturn(m.global.session, "server.id", ""))
+        if serverId = "" then serverId = toString(chainLookupReturn(m.global.session, "server.url", ""))
+
+        unsafe = CreateObject("roRegex", "[^a-z0-9]+", "i")
+        return unsafe.ReplaceAll(LCase(serverId), "_")
+    end function
+
+    function ReadKey() as string
+        return "serverMessages.read." + serverMessages.ScopeKey()
+    end function
+
+    function CachePath() as string
+        return "cachefs:/moonfinMessages_" + serverMessages.ScopeKey() + ".json"
+    end function
+
+    function ReadIds() as object
+        stored = registry_read(serverMessages.ReadKey(), m.global.session.user.id)
+        if not isValidAndNotEmpty(stored) then return []
+
+        parsed = ParseJSON(stored)
+        if not isValid(parsed) or type(parsed) <> "roArray" then return []
+
+        ids = []
+        for each id in parsed
+            if type(id) = "roString" or type(id) = "String" then ids.push(id)
+        end for
+        return ids
+    end function
+
+    sub SaveReadIds(ids as object)
+        registry_write(serverMessages.ReadKey(), FormatJSON(ids), m.global.session.user.id)
+        m.global.serverMessagesRead = ids
+        serverMessages.notifyChanged()
+    end sub
+
+    sub notifyChanged()
+        m.global.serverMessagesChanged = m.global.serverMessagesChanged + 1
+    end sub
+
+    function All() as object
+        list = m.global.serverMessages
+        if not isValid(list) then return []
+        return list
+    end function
+
+    function IsRead(id as string) as boolean
+        for each known in m.global.serverMessagesRead
+            if known = id then return true
+        end for
+        return false
+    end function
+
+    function UnreadCount() as integer
+        count = 0
+        for each message in serverMessages.All()
+            if not serverMessages.IsRead(message.id) then count++
+        end for
+        return count
+    end function
+
+    ' Unread messages the admin marked as open the window
+    function PendingPopups() as object
+        pending = []
+        for each message in serverMessages.All()
+            if message.delivery = "popup" and not serverMessages.IsRead(message.id)
+                pending.push(message)
+            end if
+        end for
+        return pending
+    end function
+
+    sub MarkRead(id as string)
+        if serverMessages.IsRead(id) then return
+
+        ids = serverMessages.ReadIds()
+        ids.push(id)
+        serverMessages.SaveReadIds(ids)
+    end sub
+
+    ' Showing the open the window messages counts as reading them, otherwise the
+    ' window would open again on every refresh.
+    sub MarkPopupsRead()
+        pending = serverMessages.PendingPopups()
+        if pending.count() = 0 then return
+
+        ids = serverMessages.ReadIds()
+        for each message in pending
+            ids.push(message.id)
+        end for
+        serverMessages.SaveReadIds(ids)
+    end sub
+
+    sub MarkAllRead()
+        if serverMessages.UnreadCount() = 0 then return
+
+        ids = serverMessages.ReadIds()
+        for each message in serverMessages.All()
+            if not serverMessages.IsRead(message.id) then ids.push(message.id)
+        end for
+        serverMessages.SaveReadIds(ids)
+    end sub
+
+    ' The cache comes first, so messages are there even with no connection
+    sub LoadCache()
+        m.global.serverMessagesRead = serverMessages.ReadIds()
+
+        cached = ReadAsciiFile(serverMessages.CachePath())
+        if not isValidAndNotEmpty(cached) then return
+
+        list = serverMessages.ParseList(ParseJSON(cached))
+        if list.count() = 0 then return
+
+        m.global.serverMessages = list
+        serverMessages.notifyChanged()
+    end sub
+
+    ' What the server just sent, kept for next time. Read ids for messages it no
+    ' longer sends are dropped, so the list does not grow forever.
+    sub Apply(list as object)
+        if not isValid(list) then return
+
+        m.global.serverMessages = list
+        WriteAsciiFile(serverMessages.CachePath(), FormatJSON(list))
+
+        known = serverMessages.ReadIds()
+        kept = []
+        for each id in known
+            for each message in list
+                if message.id = id
+                    kept.push(id)
+                    exit for
+                end if
+            end for
+        end for
+
+        if kept.count() <> known.count()
+            serverMessages.SaveReadIds(kept)
+        else
+            serverMessages.notifyChanged()
+        end if
+    end sub
+end namespace

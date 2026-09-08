@@ -13,6 +13,10 @@
         <translation>Action Buttons</translation>
     </message>
     <message>
+        <source>Adds a button to the menu for messages sent by your server admin</source>
+        <translation>Adds a button to the menu for messages sent by your server admin</translation>
+    </message>
+    <message>
         <source>All the details on one page.</source>
         <translation>All the details on one page.</translation>
     </message>
@@ -125,8 +129,16 @@
         <translation>MakD</translation>
     </message>
     <message>
+        <source>Mark all as read</source>
+        <translation>Mark all as read</translation>
+    </message>
+    <message>
         <source>Mark Watched</source>
         <translation>Mark Watched</translation>
+    </message>
+    <message>
+        <source>Messages</source>
+        <translation>Messages</translation>
     </message>
     <message>
         <source>Modern</source>
@@ -141,12 +153,20 @@
         <translation>Next</translation>
     </message>
     <message>
+        <source>No messages from your server yet</source>
+        <translation>No messages from your server yet</translation>
+    </message>
+    <message>
         <source>Off</source>
         <translation>Off</translation>
     </message>
     <message>
         <source>OK</source>
         <translation>OK</translation>
+    </message>
+    <message>
+        <source>Open this on your phone</source>
+        <translation>Open this on your phone</translation>
     </message>
     <message>
         <source>Options</source>
@@ -199,6 +219,10 @@
     <message>
         <source>Server not found, is it online?</source>
         <translation>Server not found, is it online?</translation>
+    </message>
+    <message>
+        <source>Show messages button</source>
+        <translation>Show messages button</translation>
     </message>
     <message>
         <source>Shuffle</source>

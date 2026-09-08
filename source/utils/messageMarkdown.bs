@@ -1,0 +1,329 @@
+' A small CommonMark reader for the text an admin wrote: headings, paragraphs,
+' lists, quotes, code and the inline marks. Images are dropped rather than
+' fetched from whatever host they name.
+namespace messageMarkdown
+
+    const ESCAPABLE = "!""#$%&'()*+,-./:;<=>?@[\]^_`{|}~"
+    const WORD_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+
+    function isWordChar(ch as string) as boolean
+        if ch = "" then return false
+        return Instr(1, messageMarkdown.WORD_CHARS, ch) > 0
+    end function
+
+    function isSpaceChar(ch as string) as boolean
+        if ch = "" then return false
+        return ch = " " or ch = Chr(9) or ch = Chr(10) or ch = Chr(13)
+    end function
+
+    function joinWith(parts as object, separator as string) as string
+        out = ""
+        for i = 0 to parts.count() - 1
+            if i > 0 then out += separator
+            out += parts[i]
+        end for
+        return out
+    end function
+
+    ' Where a closing run of the given delimiter sits, or 0. A closer has to
+    ' follow something that is not whitespace, and an underscore closer cant run
+    ' straight into a word or it is part of the word. A longer run closes with
+    ' its last marks, so the ones before them stay inside for a nested mark.
+    function findCloser(source as string, delim as string, from as integer) as integer
+        width = Len(delim)
+        lead = Left(delim, 1)
+        total = Len(source)
+
+        i = from
+        while i <= total - width + 1
+            if Mid(source, i, width) = delim
+                usable = i <> from and not messageMarkdown.isSpaceChar(Mid(source, i - 1, 1))
+                if usable and lead = "_" and messageMarkdown.isWordChar(Mid(source, i + width, 1))
+                    usable = false
+                end if
+                if usable
+                    while Mid(source, i + width, 1) = lead
+                        i += 1
+                    end while
+                    return i
+                end if
+            end if
+            i += 1
+        end while
+
+        return 0
+    end function
+
+    ' A link or image target starting at the bracket, or invalid when it does not
+    ' close the way a link has to
+    function readLink(source as string, at as integer) as object
+        closeAt = Instr(at + 1, source, "]")
+        if closeAt = 0 then return invalid
+        if Mid(source, closeAt + 1, 1) <> "(" then return invalid
+
+        endAt = Instr(closeAt + 2, source, ")")
+        if endAt = 0 then return invalid
+
+        target = Mid(source, closeAt + 2, endAt - closeAt - 2).Trim()
+        ' A title in quotes after the address is allowed and thrown away
+        href = target
+        gap = Instr(1, target, " ")
+        if gap > 0 then href = Left(target, gap - 1)
+
+        return {
+            label: Mid(source, at + 1, closeAt - at - 1),
+            href: href,
+            after: endAt + 1
+        }
+    end function
+
+    function ParseInlines(source as string) as object
+        nodes = []
+        buffer = ""
+        i = 1
+        total = Len(source)
+
+        while i <= total
+            ch = Mid(source, i, 1)
+            nxt = Mid(source, i + 1, 1)
+
+            if ch = "\" and nxt <> "" and Instr(1, messageMarkdown.ESCAPABLE, nxt) > 0
+                buffer += nxt
+                i += 2
+                continue while
+            end if
+
+            if ch = "`"
+                ticks = 1
+                while Mid(source, i + ticks, 1) = "`"
+                    ticks += 1
+                end while
+                fence = Mid(source, i, ticks)
+                closeAt = Instr(i + ticks, source, fence)
+                if closeAt > 0
+                    if buffer <> ""
+                        nodes.push({ type: "text", text: buffer })
+                        buffer = ""
+                    end if
+                    nodes.push({ type: "code", text: Mid(source, i + ticks, closeAt - i - ticks).Trim() })
+                    i = closeAt + ticks
+                    continue while
+                end if
+                buffer += fence
+                i += ticks
+                continue while
+            end if
+
+            if ch = "!" and nxt = "["
+                image = messageMarkdown.readLink(source, i + 1)
+                if isValid(image)
+                    i = image.after
+                    continue while
+                end if
+            end if
+
+            if ch = "["
+                link = messageMarkdown.readLink(source, i)
+                if isValid(link)
+                    if buffer <> ""
+                        nodes.push({ type: "text", text: buffer })
+                        buffer = ""
+                    end if
+                    nodes.push({ type: "link", href: link.href, children: messageMarkdown.ParseInlines(link.label) })
+                    i = link.after
+                    continue while
+                end if
+            end if
+
+            if ch = "*" or ch = "_"
+                delim = ch
+                if nxt = ch then delim = ch + ch
+                width = Len(delim)
+                after = Mid(source, i + width, 1)
+
+                intraword = ch = "_" and i > 1 and messageMarkdown.isWordChar(Mid(source, i - 1, 1))
+                if after <> "" and not messageMarkdown.isSpaceChar(after) and not intraword
+                    closeAt = messageMarkdown.findCloser(source, delim, i + width)
+                    if closeAt > 0
+                        if buffer <> ""
+                            nodes.push({ type: "text", text: buffer })
+                            buffer = ""
+                        end if
+                        kind = "em"
+                        if width = 2 then kind = "strong"
+                        nodes.push({ type: kind, children: messageMarkdown.ParseInlines(Mid(source, i + width, closeAt - i - width)) })
+                        i = closeAt + width
+                        continue while
+                    end if
+                end if
+
+                buffer += delim
+                i += width
+                continue while
+            end if
+
+            buffer += ch
+            i += 1
+        end while
+
+        if buffer <> "" then nodes.push({ type: "text", text: buffer })
+        return nodes
+    end function
+
+    function flushParagraph(blocks as object, lines as object) as object
+        if lines.count() = 0 then return lines
+        blocks.push({ type: "paragraph", children: messageMarkdown.ParseInlines(messageMarkdown.joinWith(lines, " ")) })
+        return []
+    end function
+
+    function ParseBlocks(source as string) as object
+        heading = CreateObject("roRegex", "^ {0,3}(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$", "")
+        quote = CreateObject("roRegex", "^ {0,3}>[ ]?(.*)$", "")
+        listItem = CreateObject("roRegex", "^ {0,3}(?:([-*+])|(\d{1,9})[.)])[ \t]+(.*)$", "")
+        fence = CreateObject("roRegex", "^ {0,3}(`{3,}|~{3,})", "")
+        continuation = CreateObject("roRegex", "^ {2,}(\S.*)$", "")
+        newlines = CreateObject("roRegex", "\r\n?", "")
+
+        lines = newlines.ReplaceAll(source, Chr(10)).Split(Chr(10))
+        blocks = []
+        para = []
+
+        i = 0
+        while i < lines.count()
+            line = lines[i]
+
+            if line.Trim() = ""
+                para = messageMarkdown.flushParagraph(blocks, para)
+                i += 1
+                continue while
+            end if
+
+            if fence.IsMatch(line)
+                para = messageMarkdown.flushParagraph(blocks, para)
+                code = []
+                i += 1
+                while i < lines.count() and not fence.IsMatch(lines[i])
+                    code.push(lines[i])
+                    i += 1
+                end while
+                blocks.push({ type: "code", text: messageMarkdown.joinWith(code, Chr(10)) })
+                i += 1
+                continue while
+            end if
+
+            headingParts = heading.Match(line)
+            if headingParts.count() > 2
+                para = messageMarkdown.flushParagraph(blocks, para)
+                blocks.push({ type: "heading", level: Len(headingParts[1]), children: messageMarkdown.ParseInlines(headingParts[2]) })
+                i += 1
+                continue while
+            end if
+
+            if quote.IsMatch(line)
+                para = messageMarkdown.flushParagraph(blocks, para)
+                quoted = []
+                while i < lines.count() and quote.IsMatch(lines[i])
+                    quoted.push(quote.Match(lines[i])[1])
+                    i += 1
+                end while
+                blocks.push({ type: "quote", children: messageMarkdown.ParseInlines(messageMarkdown.joinWith(quoted, " ")) })
+                continue while
+            end if
+
+            itemParts = listItem.Match(line)
+            if itemParts.count() > 3
+                para = messageMarkdown.flushParagraph(blocks, para)
+                ordered = itemParts[2] <> ""
+                items = []
+                while i < lines.count()
+                    entry = listItem.Match(lines[i])
+                    if entry.count() < 4 then exit while
+                    if (entry[2] <> "") <> ordered then exit while
+
+                    parts = [entry[3]]
+                    i += 1
+                    ' A line indented under the item carries on its text
+                    while i < lines.count() and continuation.IsMatch(lines[i]) and not listItem.IsMatch(lines[i])
+                        parts.push(continuation.Match(lines[i])[1])
+                        i += 1
+                    end while
+                    items.push(messageMarkdown.ParseInlines(messageMarkdown.joinWith(parts, " ")))
+                end while
+                blocks.push({ type: "list", ordered: ordered, items: items })
+                continue while
+            end if
+
+            para.push(line.Trim())
+            i += 1
+        end while
+
+        messageMarkdown.flushParagraph(blocks, para)
+        return blocks
+    end function
+
+    ' The words of a run of inline nodes. A Roku label carries no inline styling,
+    ' so emphasis is read for its text rather than drawn as bold or italic.
+    function FlattenInlines(nodes as object) as string
+        out = ""
+        if not isValid(nodes) then return out
+
+        for each node in nodes
+            if node.type = "text" or node.type = "code"
+                out += node.text
+            end if
+            if isValid(node.children) then out += messageMarkdown.FlattenInlines(node.children)
+        end for
+
+        return out
+    end function
+
+    sub gatherLinks(nodes as object, seen as object, links as object)
+        if not isValid(nodes) then return
+
+        for each node in nodes
+            if node.type = "link" and node.href <> "" and not seen.DoesExist(node.href)
+                seen[node.href] = true
+                label = messageMarkdown.FlattenInlines(node.children)
+                if label = "" then label = node.href
+                links.push({ href: node.href, label: label })
+            end if
+            if isValid(node.children) then messageMarkdown.gatherLinks(node.children, seen, links)
+        end for
+    end sub
+
+    ' Every link in the text, each once, with the words it was written on. A TV
+    ' has nowhere to point a link, so these get offered on their own after the
+    ' text instead.
+    function CollectLinks(blocks as object) as object
+        seen = {}
+        links = []
+
+        for each block in blocks
+            if block.type = "list"
+                for each item in block.items
+                    messageMarkdown.gatherLinks(item, seen, links)
+                end for
+            else if isValid(block.children)
+                messageMarkdown.gatherLinks(block.children, seen, links)
+            end if
+        end for
+
+        return links
+    end function
+
+    ' Markdown syntax to drop from the preview on a closed card, so it reads as a
+    ' sentence instead of showing asterisks and hashes.
+    function Strip(source as string) as string
+        noise = CreateObject("roRegex", "^\s{0,3}#{1,6}\s+|^\s{0,3}>\s?|^\s{0,3}[-*+]\s+", "m")
+        link = CreateObject("roRegex", "\[([^\]]*)\]\([^)]*\)", "")
+        emphasis = CreateObject("roRegex", "(\*{1,3}|_{1,3}|`)", "")
+        blanks = CreateObject("roRegex", "\n{2,}", "")
+
+        out = noise.ReplaceAll(source, "")
+        out = link.ReplaceAll(out, "\1")
+        out = emphasis.ReplaceAll(out, "")
+        out = blanks.ReplaceAll(out, Chr(10))
+
+        return out.Trim()
+    end function
+end namespace

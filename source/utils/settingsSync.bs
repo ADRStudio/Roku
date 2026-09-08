@@ -21,6 +21,7 @@ namespace settingsSync
             { pluginKey: "showGenresButton", rokuKey: "navbar.show_genres", type: "bool" },
             { pluginKey: "showLibrariesInToolbar", rokuKey: "navbar.show_libraries", type: "bool" },
             { pluginKey: "showShuffleButton", rokuKey: "navbar.show_shuffle", type: "bool" },
+            { pluginKey: "showServerMessagesButton", rokuKey: "navbar.show_messages", type: "bool" },
             { pluginKey: "navbarOpacity", rokuKey: "navbar.opacity", type: "opacityToPercent" },
             { pluginKey: "navbarColor", rokuKey: "navbar.color", type: "colorName" },
             { pluginKey: "homeImageUseSeriesImage", rokuKey: "ui.home.preferThumbnails", type: "boolInvert" },

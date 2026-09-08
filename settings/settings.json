@@ -203,6 +203,14 @@
             "icon": "seerr.png",
             "type": "bool",
             "default": "false"
+          },
+          {
+            "title": "Show messages button",
+            "description": "Adds a button to the menu for messages sent by your server admin",
+            "settingName": "navbar.show_messages",
+            "icon": "info.png",
+            "type": "bool",
+            "default": "false"
           }
         ]
       },

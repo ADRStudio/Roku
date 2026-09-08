@@ -264,6 +264,34 @@ sub settings()
     settingsScreen.callFunc("OnScreenShown", false)
 end sub
 
+' The window for messages the server admin sent, opened from the menu button or
+' by a message the admin marked as open the window
+sub serverMessagesDialog()
+    if not isValid(m.scene) then return
+
+    existing = m.scene.findNode("serverMessagesOverlay")
+    if isValid(existing)
+        existing.callFunc("showDialog")
+        return
+    end if
+
+    dialog = createObject("roSGNode", "ServerMessagesDialog")
+    dialog.id = "serverMessagesOverlay"
+    dialog.returnFocus = getActiveScene()
+    dialog.observeField("closed", "onServerMessagesClosed")
+    m.scene.appendChild(dialog)
+    dialog.callFunc("showDialog")
+end sub
+
+sub onServerMessagesClosed()
+    dialog = m.scene.findNode("serverMessagesOverlay")
+    if not isValid(dialog) then return
+
+    dialog.unobserveField("closed")
+    m.scene.removeChild(dialog)
+    restoreFocusToNode(getActiveScene())
+end sub
+
 sub hideMiniPlayer()
     if not isValid(m.scene) then return
 

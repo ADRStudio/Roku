@@ -1,0 +1,689 @@
+import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/utils/messageMarkdown.bs"
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/playbackOverlay.bs"
+import "pkg:/source/utils/serverMessages.bs"
+import "pkg:/source/utils/themeChrome.bs"
+
+const PANEL_WIDTH = 1100
+const PANEL_PAD_X = 32
+const PANEL_PAD_Y = 28
+const PANEL_MAX_HEIGHT = 864
+
+const CARD_GAP = 10
+const CARD_PAD_X = 20
+const CARD_PAD_Y = 18
+const CARD_ICON = 30
+const CARD_TEXT_LEFT = 66
+const BLOCK_GAP = 8
+
+const TITLE_SIZE = 28
+const CARD_TITLE_SIZE = 22
+const BODY_SIZE = 19
+const DATE_SIZE = 15
+const BUTTON_SIZE = 19
+const CLOSE_SIZE = 44
+const DOT_SIZE = 12
+
+sub init()
+    m.panel = m.top.findNode("panel")
+    m.panelBg = m.top.findNode("panelBg")
+    m.panelBorder = m.top.findNode("panelBorder")
+    m.titleLabel = m.top.findNode("title")
+    m.closeRing = m.top.findNode("closeRing")
+    m.closeMark = m.top.findNode("closeMark")
+    m.emptyLabel = m.top.findNode("empty")
+    m.viewport = m.top.findNode("viewport")
+    m.column = m.top.findNode("column")
+    m.footerBg = m.top.findNode("footerBg")
+    m.footerLabel = m.top.findNode("footerLabel")
+
+    m.linkPanel = m.top.findNode("linkPanel")
+    m.linkBg = m.top.findNode("linkBg")
+    m.linkBorder = m.top.findNode("linkBorder")
+    m.linkTitle = m.top.findNode("linkTitle")
+    m.linkHint = m.top.findNode("linkHint")
+    m.linkUrl = m.top.findNode("linkUrl")
+    m.linkCloseBg = m.top.findNode("linkCloseBg")
+    m.linkCloseLabel = m.top.findNode("linkCloseLabel")
+
+    m.cards = []
+    m.targets = []
+    m.focusIndex = 0
+    m.expandedId = ""
+    m.scrollTop = 0
+    m.linkOpen = false
+end sub
+
+sub showDialog()
+    readPalette()
+    buildShell()
+    buildCards()
+    m.top.visible = true
+    m.top.setFocus(true)
+end sub
+
+sub readPalette()
+    m.ink = themeChrome.OnSurface()
+    m.muted = playbackOverlay.WithAlpha(m.ink, 179)
+    m.faint = playbackOverlay.WithAlpha(m.ink, 128)
+    m.buttonInk = playbackOverlay.WithAlpha(m.ink, 26)
+    m.accent = themeChrome.Accent()
+    m.onAccent = themeChrome.OnAccent()
+    m.surface = themeChrome.Surface()
+end sub
+
+sub buildShell()
+    m.panel.translation = [(1920 - PANEL_WIDTH) / 2, 0]
+
+    for each layer in [m.panelBg, m.panelBorder]
+        layer.width = PANEL_WIDTH
+    end for
+    m.panelBg.blendColor = m.surface
+
+    m.titleLabel.text = tr("Messages")
+    m.titleLabel.font = "font:MediumBoldSystemFont"
+    m.titleLabel.font.size = TITLE_SIZE
+    m.titleLabel.color = m.ink
+    m.titleLabel.translation = [PANEL_PAD_X, PANEL_PAD_Y]
+
+    m.closeRing.width = CLOSE_SIZE
+    m.closeRing.height = CLOSE_SIZE
+    m.closeRing.translation = [PANEL_WIDTH - PANEL_PAD_X - CLOSE_SIZE, PANEL_PAD_Y]
+
+    m.closeMark.text = "X"
+    m.closeMark.font = "font:SmallBoldSystemFont"
+    m.closeMark.font.size = 22
+    m.closeMark.width = CLOSE_SIZE
+    m.closeMark.height = CLOSE_SIZE
+    m.closeMark.horizAlign = "center"
+    m.closeMark.vertAlign = "center"
+    m.closeMark.translation = m.closeRing.translation
+
+    m.emptyLabel.text = tr("No messages from your server yet")
+    m.emptyLabel.font = "font:SmallSystemFont"
+    m.emptyLabel.font.size = 20
+    m.emptyLabel.color = m.muted
+
+    m.footerLabel.font = "font:SmallBoldSystemFont"
+    m.footerLabel.font.size = BUTTON_SIZE
+    m.footerLabel.text = tr("Mark all as read")
+    m.footerLabel.horizAlign = "center"
+    m.footerLabel.vertAlign = "center"
+end sub
+
+' ===== The cards =====
+
+sub buildCards()
+    m.column.removeChildrenIndex(m.column.getChildCount(), 0)
+    m.cards = []
+
+    messages = serverMessages.All()
+    m.emptyLabel.visible = messages.count() = 0
+
+    for each message in messages
+        m.cards.push(buildCard(message))
+    end for
+
+    layoutColumn()
+    rebuildTargets()
+    m.focusIndex = 0
+    if m.cards.count() > 0 then m.focusIndex = 1
+    applyFocus()
+end sub
+
+function buildCard(message as object) as object
+    width = PANEL_WIDTH - (PANEL_PAD_X * 2)
+    color = serverMessages.ColorFor(message.color)
+
+    group = m.column.createChild("Group")
+
+    border = group.createChild("Poster")
+    border.uri = "pkg:/images/details/cardborder12.9.png"
+    border.width = width
+    border.blendColor = color
+
+    background = group.createChild("Poster")
+    background.uri = "pkg:/images/details/surface12.9.png"
+    background.width = width - 4
+    background.translation = [2, 2]
+    background.blendColor = m.ink
+    background.opacity = 0.06
+
+    icon = group.createChild("Poster")
+    icon.uri = "pkg:/images/icons/messages.png"
+    icon.width = CARD_ICON
+    icon.height = CARD_ICON
+    icon.loadDisplayMode = "scaleToFit"
+    icon.blendColor = color
+    icon.translation = [CARD_PAD_X, CARD_PAD_Y + 2]
+
+    titleLabel = group.createChild("Label")
+    titleLabel.font = "font:MediumBoldSystemFont"
+    titleLabel.font.size = CARD_TITLE_SIZE
+    titleLabel.color = m.ink
+    titleLabel.text = message.title
+    if message.title = "" then titleLabel.text = tr("Messages")
+    titleLabel.maxWidth = width - CARD_TEXT_LEFT - CARD_PAD_X - 40
+    titleLabel.translation = [CARD_TEXT_LEFT, CARD_PAD_Y]
+
+    dot = group.createChild("Poster")
+    dot.uri = "pkg:/images/icons/circle.png"
+    dot.width = DOT_SIZE
+    dot.height = DOT_SIZE
+    dot.blendColor = color
+    dot.translation = [CARD_TEXT_LEFT + titleLabel.boundingRect().width + 12, CARD_PAD_Y + 10]
+    dot.visible = not serverMessages.IsRead(message.id)
+
+    card = {
+        id: message.id,
+        message: message,
+        group: group,
+        border: border,
+        dot: dot,
+        body: invalid,
+        actions: [],
+        height: 0
+    }
+
+    below = CARD_PAD_Y + titleLabel.boundingRect().height
+
+    if message.createdUtc <> ""
+        dateLabel = group.createChild("Label")
+        dateLabel.font = "font:SmallSystemFont"
+        dateLabel.font.size = DATE_SIZE
+        dateLabel.color = m.faint
+        dateLabel.text = formatWhen(message.createdUtc)
+        dateLabel.translation = [CARD_TEXT_LEFT, below + 2]
+        below += dateLabel.boundingRect().height + 2
+    end if
+
+    bodyGroup = group.createChild("Group")
+    bodyGroup.translation = [CARD_TEXT_LEFT, below + BLOCK_GAP]
+    card.body = bodyGroup
+
+    below += BLOCK_GAP + fillBody(card, width)
+    below += CARD_PAD_Y
+
+    card.height = below
+    border.height = below
+    background.height = below - 4
+
+    return card
+end function
+
+' The body a card shows: two lines of preview while it is closed, the whole
+' message once it is open
+function fillBody(card as object, width as float) as float
+    body = card.body
+    body.removeChildrenIndex(body.getChildCount(), 0)
+    card.actions = []
+
+    message = card.message
+    textWidth = width - CARD_TEXT_LEFT - CARD_PAD_X
+    if message.body = "" and not isExpanded(card) then return 0
+
+    if not isExpanded(card)
+        preview = body.createChild("Label")
+        preview.font = "font:SmallSystemFont"
+        preview.font.size = BODY_SIZE
+        preview.color = m.muted
+        preview.width = textWidth
+        preview.wrap = true
+        preview.maxLines = 2
+        preview.ellipsisText = "..."
+        preview.text = messageMarkdown.Strip(message.body)
+        return preview.boundingRect().height
+    end if
+
+    blocks = messageMarkdown.ParseBlocks(message.body)
+    used = drawBlocks(body, blocks, textWidth)
+
+    ' The admin's button first, then any link written into the text. A TV has
+    ' nowhere to point a link, so each is offered under the message instead.
+    links = []
+    if serverMessages.HasAction(message)
+        links.push({ href: message.actionUrl, label: message.actionLabel })
+    end if
+    for each link in messageMarkdown.CollectLinks(blocks)
+        known = false
+        for each entry in links
+            if entry.href = link.href then known = true
+        end for
+        if not known then links.push(link)
+    end for
+
+    if links.count() > 0
+        used += BLOCK_GAP
+        left = 0
+        rowHeight = 0
+        for each link in links
+            button = buildButton(body, link.label, left, used)
+            button.link = link
+            card.actions.push(button)
+            left += button.width + 10
+            rowHeight = button.height
+        end for
+        used += rowHeight
+    end if
+
+    return used
+end function
+
+function drawBlocks(parent as object, blocks as object, textWidth as float) as float
+    used = 0
+
+    for each block in blocks
+        if used > 0 then used += BLOCK_GAP
+
+        if block.type = "list"
+            for each item in block.items
+                line = parent.createChild("Label")
+                line.font = "font:SmallSystemFont"
+                line.font.size = BODY_SIZE
+                line.color = m.muted
+                line.width = textWidth - 28
+                line.wrap = true
+                line.text = "• " + messageMarkdown.FlattenInlines(item)
+                line.translation = [28, used]
+                used += line.boundingRect().height
+            end for
+            used -= BLOCK_GAP
+            used += BLOCK_GAP
+            continue for
+        end if
+
+        line = parent.createChild("Label")
+        line.wrap = true
+        line.width = textWidth
+        line.translation = [0, used]
+
+        if block.type = "heading"
+            line.font = "font:MediumBoldSystemFont"
+            size = 20
+            if block.level <= 1 then size = 24
+            if block.level = 2 then size = 22
+            line.font.size = size
+            line.color = m.ink
+            line.text = messageMarkdown.FlattenInlines(block.children)
+        else if block.type = "code"
+            line.font = "font:SmallSystemFont"
+            line.font.size = 17
+            line.color = m.muted
+            line.text = block.text
+        else if block.type = "quote"
+            line.font = "font:SmallSystemFont"
+            line.font.size = BODY_SIZE
+            line.color = m.muted
+            line.width = textWidth - 14
+            line.translation = [14, used]
+            line.text = messageMarkdown.FlattenInlines(block.children)
+
+            rule = parent.createChild("Rectangle")
+            rule.width = 3
+            rule.color = m.faint
+            rule.translation = [0, used]
+            rule.height = line.boundingRect().height
+        else
+            line.font = "font:SmallSystemFont"
+            line.font.size = BODY_SIZE
+            line.color = m.muted
+            line.text = messageMarkdown.FlattenInlines(block.children)
+        end if
+
+        used += line.boundingRect().height
+    end for
+
+    return used
+end function
+
+function buildButton(parent as object, text as string, x as float, y as float) as object
+    label = parent.createChild("Label")
+    label.font = "font:SmallBoldSystemFont"
+    label.font.size = BUTTON_SIZE
+    label.text = text
+    width = label.boundingRect().width + 48
+    height = label.boundingRect().height + 24
+
+    background = parent.createChild("Poster")
+    background.uri = "pkg:/images/details/surface12.9.png"
+    background.width = width
+    background.height = height
+    background.translation = [x, y]
+    background.blendColor = m.ink
+    background.opacity = 0.1
+
+    label.width = width
+    label.height = height
+    label.horizAlign = "center"
+    label.vertAlign = "center"
+    label.color = m.ink
+    label.translation = [x, y]
+
+    ' The label is drawn after the background above, so it is lifted back over it
+    parent.removeChild(label)
+    parent.appendChild(label)
+
+    return { background: background, label: label, width: width, height: height, link: invalid }
+end function
+
+function isExpanded(card as object) as boolean
+    return card.id = m.expandedId
+end function
+
+function formatWhen(iso as string) as string
+    parsed = CreateObject("roDateTime")
+    parsed.FromISO8601String(iso)
+    if parsed.AsSeconds() = 0 then return ""
+
+    parsed.ToLocalTime()
+    return parsed.AsDateString("short-month-no-weekday") + " " + formatTime(parsed)
+end function
+
+' ===== Layout and focus =====
+
+sub layoutColumn()
+    top = 0
+    for each card in m.cards
+        card.group.translation = [0, top]
+        top += card.height + CARD_GAP
+    end for
+    m.columnHeight = top
+
+    headerBottom = PANEL_PAD_Y + m.titleLabel.boundingRect().height + 20
+    unread = serverMessages.UnreadCount()
+
+    footerHeight = 0
+    m.footerBg.visible = unread > 0
+    m.footerLabel.visible = unread > 0
+    if unread > 0
+        footerWidth = m.footerLabel.boundingRect().width + 48
+        footerHeight = m.footerLabel.boundingRect().height + 24 + 16
+        m.footerBg.width = footerWidth
+        m.footerBg.height = footerHeight - 16
+        m.footerLabel.width = footerWidth
+        m.footerLabel.height = footerHeight - 16
+    end if
+
+    room = PANEL_MAX_HEIGHT - headerBottom - PANEL_PAD_Y - footerHeight
+    windowHeight = m.columnHeight
+    if windowHeight > room then windowHeight = room
+    if m.cards.count() = 0 then windowHeight = m.emptyLabel.boundingRect().height + 24
+
+    m.windowHeight = windowHeight
+    m.viewport.translation = [PANEL_PAD_X, headerBottom]
+    m.viewport.clippingRect = [0, 0, PANEL_WIDTH - (PANEL_PAD_X * 2), windowHeight]
+    m.emptyLabel.translation = [PANEL_PAD_X, headerBottom + 8]
+
+    panelHeight = headerBottom + windowHeight + footerHeight + PANEL_PAD_Y
+    for each layer in [m.panelBg, m.panelBorder]
+        layer.height = panelHeight
+    end for
+    m.panel.translation = [(1920 - PANEL_WIDTH) / 2, (1080 - panelHeight) / 2]
+
+    if unread > 0
+        footerTop = headerBottom + windowHeight + 16
+        footerLeft = (PANEL_WIDTH - m.footerBg.width) / 2
+        m.footerBg.translation = [footerLeft, footerTop]
+        m.footerLabel.translation = [footerLeft, footerTop]
+    end if
+
+    m.scrollTop = 0
+    m.column.translation = [0, 0]
+end sub
+
+' Every place focus can land, in the order the remote walks them
+sub rebuildTargets()
+    m.targets = [{ kind: "close" }]
+
+    index = 0
+    for each card in m.cards
+        m.targets.push({ kind: "card", card: index })
+        if isExpanded(card)
+            for at = 0 to card.actions.count() - 1
+                m.targets.push({ kind: "action", card: index, action: at })
+            end for
+        end if
+        index++
+    end for
+
+    if serverMessages.UnreadCount() > 0 then m.targets.push({ kind: "markAll" })
+    if m.focusIndex >= m.targets.count() then m.focusIndex = m.targets.count() - 1
+    if m.focusIndex < 0 then m.focusIndex = 0
+end sub
+
+sub applyFocus()
+    target = m.targets[m.focusIndex]
+
+    m.closeRing.blendColor = m.buttonInk
+    m.closeMark.color = m.muted
+    if target.kind = "close"
+        m.closeRing.blendColor = m.accent
+        m.closeMark.color = m.onAccent
+    end if
+
+    index = 0
+    for each card in m.cards
+        focused = target.kind <> "close" and target.kind <> "markAll" and target.card = index
+        ' The border is the message's colour, solid on the card being read
+        card.border.opacity = focused ? 1.0 : 0.35
+
+        for at = 0 to card.actions.count() - 1
+            button = card.actions[at]
+            hot = focused and target.kind = "action" and target.action = at
+            button.background.blendColor = hot ? m.accent : m.ink
+            button.background.opacity = hot ? 1.0 : 0.1
+            button.label.color = hot ? m.onAccent : m.ink
+        end for
+
+        index++
+    end for
+
+    if m.footerBg.visible
+        hot = target.kind = "markAll"
+        m.footerBg.blendColor = hot ? m.accent : m.ink
+        m.footerBg.opacity = hot ? 1.0 : 0.1
+        m.footerLabel.color = hot ? m.onAccent : m.ink
+    end if
+
+    scrollIntoView(target)
+end sub
+
+sub scrollIntoView(target as object)
+    if target.kind = "close" or target.kind = "markAll"
+        return
+    end if
+
+    card = m.cards[target.card]
+    top = card.group.translation[1]
+    bottom = top + card.height
+
+    if top < m.scrollTop
+        m.scrollTop = top
+    else if bottom > m.scrollTop + m.windowHeight
+        m.scrollTop = bottom - m.windowHeight
+    end if
+
+    limit = m.columnHeight - m.windowHeight
+    if limit < 0 then limit = 0
+    if m.scrollTop > limit then m.scrollTop = limit
+    if m.scrollTop < 0 then m.scrollTop = 0
+
+    m.column.translation = [0, -m.scrollTop]
+end sub
+
+' ===== Acting on a row =====
+
+sub toggleCard(index as integer)
+    card = m.cards[index]
+
+    if isExpanded(card)
+        m.expandedId = ""
+    else
+        m.expandedId = card.id
+        serverMessages.MarkRead(card.id)
+    end if
+
+    rebuildCard(card)
+    layoutColumn()
+    rebuildTargets()
+
+    ' Focus stays on the card that was just opened or closed
+    at = 0
+    for each target in m.targets
+        if target.kind = "card" and target.card = index then m.focusIndex = at
+        at++
+    end for
+
+    applyFocus()
+end sub
+
+sub rebuildCard(card as object)
+    width = PANEL_WIDTH - (PANEL_PAD_X * 2)
+
+    ' The dot goes with the message being read
+    card.dot.visible = not serverMessages.IsRead(card.id)
+
+    below = card.body.translation[1]
+    below += fillBody(card, width)
+    below += CARD_PAD_Y
+
+    card.height = below
+    card.border.height = below
+    card.group.getChild(1).height = below - 4
+end sub
+
+sub openLink(link as object)
+    m.linkOpen = true
+
+    m.linkTitle.text = link.label
+    m.linkTitle.font = "font:MediumBoldSystemFont"
+    m.linkTitle.font.size = TITLE_SIZE
+    m.linkTitle.color = m.ink
+    m.linkTitle.width = PANEL_WIDTH
+    m.linkTitle.horizAlign = "center"
+
+    m.linkHint.text = tr("Open this on your phone")
+    m.linkHint.font = "font:SmallSystemFont"
+    m.linkHint.font.size = 18
+    m.linkHint.color = m.muted
+    m.linkHint.width = PANEL_WIDTH
+    m.linkHint.horizAlign = "center"
+
+    m.linkUrl.text = link.href
+    m.linkUrl.font = "font:SmallSystemFont"
+    m.linkUrl.font.size = BODY_SIZE
+    m.linkUrl.color = m.ink
+    m.linkUrl.width = PANEL_WIDTH - (PANEL_PAD_X * 2)
+    m.linkUrl.wrap = true
+    m.linkUrl.horizAlign = "center"
+
+    m.linkCloseLabel.text = tr("Close")
+    m.linkCloseLabel.font = "font:SmallBoldSystemFont"
+    m.linkCloseLabel.font.size = BUTTON_SIZE
+    m.linkCloseLabel.horizAlign = "center"
+    m.linkCloseLabel.vertAlign = "center"
+    m.linkCloseLabel.color = m.onAccent
+
+    top = PANEL_PAD_Y
+    m.linkTitle.translation = [0, top]
+    top += m.linkTitle.boundingRect().height + 12
+    m.linkHint.translation = [0, top]
+    top += m.linkHint.boundingRect().height + 20
+    m.linkUrl.translation = [PANEL_PAD_X, top]
+    top += m.linkUrl.boundingRect().height + 24
+
+    buttonWidth = m.linkCloseLabel.boundingRect().width + 48
+    buttonHeight = m.linkCloseLabel.boundingRect().height + 24
+    m.linkCloseBg.width = buttonWidth
+    m.linkCloseBg.height = buttonHeight
+    m.linkCloseBg.blendColor = m.accent
+    m.linkCloseLabel.width = buttonWidth
+    m.linkCloseLabel.height = buttonHeight
+    m.linkCloseBg.translation = [(PANEL_WIDTH - buttonWidth) / 2, top]
+    m.linkCloseLabel.translation = m.linkCloseBg.translation
+    top += buttonHeight + PANEL_PAD_Y
+
+    for each layer in [m.linkBg, m.linkBorder]
+        layer.width = PANEL_WIDTH
+        layer.height = top
+    end for
+    m.linkBg.blendColor = m.surface
+    m.linkPanel.translation = [(1920 - PANEL_WIDTH) / 2, (1080 - top) / 2]
+
+    m.linkPanel.visible = true
+    m.panel.visible = false
+end sub
+
+sub closeLink()
+    m.linkOpen = false
+    m.linkPanel.visible = false
+    m.panel.visible = true
+end sub
+
+sub closeDialog()
+    m.top.visible = false
+    if isValid(m.top.returnFocus) then m.top.returnFocus.setFocus(true)
+    m.top.closed = true
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+    if not m.top.visible then return false
+
+    if key = KeyCode.BACK
+        ' Back closes the address before it closes the window
+        if m.linkOpen
+            closeLink()
+        else
+            closeDialog()
+        end if
+        return true
+    end if
+
+    if m.linkOpen
+        if key = KeyCode.OK
+            closeLink()
+            return true
+        end if
+        return true
+    end if
+
+    if key = KeyCode.UP
+        if m.focusIndex > 0
+            m.focusIndex--
+            applyFocus()
+        end if
+        return true
+    end if
+
+    if key = KeyCode.DOWN
+        if m.focusIndex < m.targets.count() - 1
+            m.focusIndex++
+            applyFocus()
+        end if
+        return true
+    end if
+
+    if key = KeyCode.OK
+        target = m.targets[m.focusIndex]
+        if target.kind = "close"
+            closeDialog()
+        else if target.kind = "card"
+            toggleCard(target.card)
+        else if target.kind = "action"
+            openLink(m.cards[target.card].actions[target.action].link)
+        else if target.kind = "markAll"
+            serverMessages.MarkAllRead()
+            for each card in m.cards
+                card.dot.visible = false
+            end for
+            layoutColumn()
+            rebuildTargets()
+            applyFocus()
+        end if
+        return true
+    end if
+
+    return false
+end function

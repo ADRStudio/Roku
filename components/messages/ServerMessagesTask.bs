@@ -1,0 +1,20 @@
+import "pkg:/source/api/MoonfinPlugin.bs"
+import "pkg:/source/utils/serverMessages.bs"
+
+sub init()
+    m.top.functionName = "loadMessages"
+end sub
+
+sub loadMessages()
+    payload = moonfinPlugin.Messages()
+    if not isValid(payload)
+        ' Server unreachable, or a plugin without the endpoint. Whatever the
+        ' cache gave us stands.
+        m.top.reached = false
+        m.top.serverMessagesLoaded = []
+        return
+    end if
+
+    m.top.reached = true
+    m.top.serverMessagesLoaded = serverMessages.ParseList(payload)
+end sub
