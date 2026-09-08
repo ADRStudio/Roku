@@ -564,12 +564,19 @@ function loadSimilar() as object
         recSource = settings["ui.home.sinceYouWatchedSource"] ?? "local"
     end if
 
-    if LCase(recSource) = "online"
+    mode = LCase(recSource)
+
+    if mode = "online"
         onlineItems = loadOnlineSimilar()
         if isValidAndNotEmpty(onlineItems) then return onlineItems
-    else if LCase(recSource) = "local"
+    else if mode = "local"
         localItems = loadLocalSimilar()
         if isValidAndNotEmpty(localItems) then return localItems
+    else if mode = "hybrid"
+        serverItems = loadJellyfinSimilar()
+        if isValidAndNotEmpty(serverItems) then return serverItems
+
+        return loadLocalSimilar()
     end if
 
     return loadJellyfinSimilar()

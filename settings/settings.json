@@ -560,7 +560,7 @@
               },
               {
                 "title": "Recommendation Engine Source",
-                "description": "Select the recommendation engine source for home screen recommendations",
+                "description": "Where recommendations come from. Server uses the engine your Jellyfin server sets per library, Local scores your library on this device, Online uses Seerr, and Hybrid leads with the server and tops up locally.",
                 "settingName": "ui.home.recommendationSource",
                 "type": "radio",
                 "default": "server",
@@ -572,6 +572,10 @@
                   {
                     "title": "Local",
                     "id": "local"
+                  },
+                  {
+                    "title": "Online",
+                    "id": "online"
                   },
                   {
                     "title": "Hybrid",

@@ -276,13 +276,12 @@ namespace moonfinPlugin
         return companies
     end function
 
-    ' Builds a Poster uri for a cached TMDB studio logo. The endpoint takes the
-    ' access token as an api_key query param.
+    ' Builds a Poster uri for a cached TMDB studio logo. A Poster node can't send the
+    ' Authorization header, and Jellyfin 12 drops the api_key query param with the
+    ' rest of the legacy authorization, so the endpoint serves this one anonymously.
     function StudioImageURL(companyId as dynamic) as string
         if not isValid(companyId) then return ""
-        token = getAuthTokenFromRegistry()
-        if not isValidAndNotEmpty(token) then return ""
-        return buildURL("/Moonfin/Tmdb/StudioImage/" + `${companyId}`, { api_key: token })
+        return buildURL("/Moonfin/Tmdb/StudioImage/" + `${companyId}`, {})
     end function
 
     function ParseBoolSetting(value as dynamic, defaultVal as boolean) as boolean

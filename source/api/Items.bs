@@ -118,87 +118,207 @@ function ItemPostPlaybackInfoForServer(serverData as object, id as string, media
     return postJson(req, FormatJson(body))
 end function
 
-function searchMedia(query as string)
-    if query <> ""
-        data = api.items.Get({
-            "userid": m.global.session.user.id,
-            "searchTerm": query,
-            "fields": "ChildCount, ItemCounts, Genres, RecursiveItemCount",
-            "IncludeItemTypes": "LiveTvChannel,Movie,BoxSet,Series,Episode,Video,Audio,MusicAlbum,MusicArtist,Playlist",
-            "EnableTotalRecordCount": false,
-            "ImageTypeLimit": 1,
-            "Recursive": true,
-            "limit": 100
-        })
+' Plugins can only contribute search results through /Search/Hints, and that is new
+' in Jellyfin 12, so older servers stay on the plain /Items search.
+function serverSupportsSearchHints() as boolean
+    if not isChainValid(m.global, "session.server.version") then return false
 
-        people = api.persons.Get({
-            "userid": m.global.session.user.id,
-            "searchTerm": query,
-            "EnableTotalRecordCount": false,
-            "ImageTypeLimit": 1,
-            "limit": 100
-        })
+    version = m.global.session.server.version
+    if not isValidAndNotEmpty(version) then return false
 
-        if isValid(data) and isValid(people)
-            data.Items.Append(people.Items)
-        else if isValid(people)
-            data = people
-        end if
+    return serverVersionMeetsMinimumRequirements(version.ToStr(), [12, 0, 0])
+end function
 
-        liveTv = api.items.Get({
-            "userid": m.global.session.user.id,
-            "searchTerm": query,
-            "IncludeItemTypes": "LiveTvProgram",
-            "EnableTotalRecordCount": false,
-            "ImageTypeLimit": 1,
-            "Recursive": true,
-            "limit": 100,
-            "IsMovie": false,
-            "IsSeries": false,
-            "IsSports": false,
-            "IsNews": false,
-            "IsKids": false
-        })
+' Hints carry far fewer fields than items, so hydrate the ids back into real items
+' and keep the order the search providers ranked them in.
+function searchViaHints(query as string) as dynamic
+    hintData = api.search.GetHints({
+        "userId": m.global.session.user.id,
+        "searchTerm": query,
+        "limit": 100,
+        "includePeople": true,
+        "includeMedia": true,
+        "includeArtists": true,
+        "includeGenres": false,
+        "includeStudios": false
+    })
 
-        if isValid(data) and isValid(liveTv)
-            data.Items.Append(liveTv.Items)
-        else if isValid(liveTv)
-            data = liveTv
-        else if not isValid(data)
-            return { Items: [], TotalRecordCount: 0 }
-        end if
+    if not isChainValid(hintData, "SearchHints") then return invalid
+    if not isValidAndNotEmpty(hintData.SearchHints) then return invalid
 
-        results = []
-        for each item in data.Items
-            tmp = CreateObject("roSGNode", "SearchData")
+    orderedIds = []
+    hintsById = {}
+    for each hint in hintData.SearchHints
+        id = searchHintId(hint)
+        if id = "" or hintsById.DoesExist(id) then continue for
 
-            imgNode = CreateObject("roSGNode", "ImageData")
-            imgNode.imagetype = ImageType.PRIMARY
-            imgNode.url = ImageURL(item.id, ImageType.PRIMARY, { "maxWidth": 400, "maxHeight": 250, "quality": "90" })
-            tmp.image = imgNode
+        hintsById[id] = hint
+        orderedIds.push(id)
+    end for
 
-            tmp.id = item.LookupCI("id")
-            tmp.title = item.LookupCI("name")
-            tmp.AlbumArtist = item.LookupCI("AlbumArtist")
-            tmp.album = item.LookupCI("album")
-            tmp.type = item.LookupCI("type")
-            tmp.RunTimeTicks = item.LookupCI("RunTimeTicks")
-            tmp.ProductionYear = item.LookupCI("ProductionYear")
-            tmp.EndDate = item.LookupCI("EndDate")
-            tmp.OfficialRating = item.LookupCI("OfficialRating")
-            tmp.IndexNumber = item.LookupCI("IndexNumber")
-            tmp.seriesname = item.LookupCI("seriesname")
-            tmp.SeasonName = item.LookupCI("SeasonName")
-            tmp.IndexNumberEnd = item.LookupCI("IndexNumberEnd")
-            tmp.ParentIndexNumber = item.LookupCI("ParentIndexNumber")
-            tmp.json = item
+    if orderedIds.Count() = 0 then return invalid
 
-            results.push(tmp)
+    hydrated = {}
+    itemData = api.items.Get({
+        "userId": m.global.session.user.id,
+        "ids": joinSearchHintIds(orderedIds),
+        "fields": "ChildCount, ItemCounts, Genres, RecursiveItemCount",
+        "EnableTotalRecordCount": false,
+        "ImageTypeLimit": 1,
+        "limit": orderedIds.Count()
+    })
+
+    if isChainValid(itemData, "Items")
+        for each item in itemData.Items
+            id = item.LookupCI("Id")
+            if isValidAndNotEmpty(id) then hydrated[id] = item
         end for
-        data.Items = results
-        return data
     end if
-    return { Items: [], TotalRecordCount: 0 }
+
+    items = []
+    for each id in orderedIds
+        item = hydrated[id]
+        ' People are not returned by an item lookup, but the hint carries enough to draw a card
+        if not isValid(item) then item = itemFromSearchHint(hintsById[id])
+        if isValid(item) then items.push(item)
+    end for
+
+    if items.Count() = 0 then return invalid
+
+    return { Items: items, TotalRecordCount: items.Count() }
+end function
+
+function searchHintId(hint as dynamic) as string
+    if not isValid(hint) then return ""
+
+    id = hint.LookupCI("Id")
+    if not isValidAndNotEmpty(id) then return ""
+
+    return id.ToStr()
+end function
+
+function joinSearchHintIds(ids as object) as string
+    result = ""
+    for each id in ids
+        if result <> "" then result = result + ","
+        result = result + id
+    end for
+    return result
+end function
+
+function itemFromSearchHint(hint as dynamic) as dynamic
+    id = searchHintId(hint)
+    if id = "" then return invalid
+
+    item = {
+        Id: id,
+        Name: hint.LookupCI("Name"),
+        Type: hint.LookupCI("Type"),
+        RunTimeTicks: hint.LookupCI("RunTimeTicks"),
+        ProductionYear: hint.LookupCI("ProductionYear"),
+        IndexNumber: hint.LookupCI("IndexNumber"),
+        ParentIndexNumber: hint.LookupCI("ParentIndexNumber"),
+        EndDate: hint.LookupCI("EndDate"),
+        SeriesName: hint.LookupCI("Series"),
+        Album: hint.LookupCI("Album"),
+        AlbumArtist: hint.LookupCI("AlbumArtist")
+    }
+
+    primaryTag = hint.LookupCI("PrimaryImageTag")
+    if isValidAndNotEmpty(primaryTag) then item.ImageTags = { Primary: primaryTag }
+
+    return item
+end function
+
+function searchViaItems(query as string) as dynamic
+    data = api.items.Get({
+        "userid": m.global.session.user.id,
+        "searchTerm": query,
+        "fields": "ChildCount, ItemCounts, Genres, RecursiveItemCount",
+        "IncludeItemTypes": "LiveTvChannel,Movie,BoxSet,Series,Episode,Video,Audio,MusicAlbum,MusicArtist,Playlist",
+        "EnableTotalRecordCount": false,
+        "ImageTypeLimit": 1,
+        "Recursive": true,
+        "limit": 100
+    })
+
+    people = api.persons.Get({
+        "userid": m.global.session.user.id,
+        "searchTerm": query,
+        "EnableTotalRecordCount": false,
+        "ImageTypeLimit": 1,
+        "limit": 100
+    })
+
+    if isValid(data) and isValid(people)
+        data.Items.Append(people.Items)
+    else if isValid(people)
+        data = people
+    end if
+
+    return data
+end function
+
+function searchMedia(query as string)
+    if query = "" then return { Items: [], TotalRecordCount: 0 }
+
+    data = invalid
+    if serverSupportsSearchHints() then data = searchViaHints(query)
+    if not isValid(data) then data = searchViaItems(query)
+
+    liveTv = api.items.Get({
+        "userid": m.global.session.user.id,
+        "searchTerm": query,
+        "IncludeItemTypes": "LiveTvProgram",
+        "EnableTotalRecordCount": false,
+        "ImageTypeLimit": 1,
+        "Recursive": true,
+        "limit": 100,
+        "IsMovie": false,
+        "IsSeries": false,
+        "IsSports": false,
+        "IsNews": false,
+        "IsKids": false
+    })
+
+    if isValid(data) and isValid(liveTv)
+        data.Items.Append(liveTv.Items)
+    else if isValid(liveTv)
+        data = liveTv
+    else if not isValid(data)
+        return { Items: [], TotalRecordCount: 0 }
+    end if
+
+    results = []
+    for each item in data.Items
+        tmp = CreateObject("roSGNode", "SearchData")
+
+        imgNode = CreateObject("roSGNode", "ImageData")
+        imgNode.imagetype = ImageType.PRIMARY
+        imgNode.url = ImageURL(item.id, ImageType.PRIMARY, { "maxWidth": 400, "maxHeight": 250, "quality": "90" })
+        tmp.image = imgNode
+
+        tmp.id = item.LookupCI("id")
+        tmp.title = item.LookupCI("name")
+        tmp.AlbumArtist = item.LookupCI("AlbumArtist")
+        tmp.album = item.LookupCI("album")
+        tmp.type = item.LookupCI("type")
+        tmp.RunTimeTicks = item.LookupCI("RunTimeTicks")
+        tmp.ProductionYear = item.LookupCI("ProductionYear")
+        tmp.EndDate = item.LookupCI("EndDate")
+        tmp.OfficialRating = item.LookupCI("OfficialRating")
+        tmp.IndexNumber = item.LookupCI("IndexNumber")
+        tmp.seriesname = item.LookupCI("seriesname")
+        tmp.SeasonName = item.LookupCI("SeasonName")
+        tmp.IndexNumberEnd = item.LookupCI("IndexNumberEnd")
+        tmp.ParentIndexNumber = item.LookupCI("ParentIndexNumber")
+        tmp.json = item
+
+        results.push(tmp)
+    end for
+
+    data.Items = results
+    return data
 end function
 
 ' MetaData about an item

@@ -40,6 +40,7 @@ sub search()
     port = CreateObject("roMessagePort")
     activeRequests = {}
     allItems = []
+    hintItems = []
     totalCount = 0
 
     for each userSession in allSessions
@@ -51,6 +52,11 @@ sub search()
         personsInfo = startSearchRequest(userSession, port, "persons", query)
         if isValid(personsInfo)
             activeRequests[personsInfo.id] = { session: userSession, type: "persons", request: personsInfo.request }
+        end if
+
+        hintsInfo = startSearchRequest(userSession, port, "hints", query)
+        if isValid(hintsInfo)
+            activeRequests[hintsInfo.id] = { session: userSession, type: "hints", request: hintsInfo.request }
         end if
     end for
 
@@ -86,7 +92,17 @@ sub search()
                     responseBody = msg.GetString()
                     data = ParseJson(responseBody)
 
-                    if isValid(data) and isChainValid(data, "Items")
+                    if requestInfo.type = "hints"
+                        if isChainValid(data, "SearchHints")
+                            for each hint in data.SearchHints
+                                hintItem = itemFromSearchHint(hint)
+                                if isValid(hintItem)
+                                    searchNode = transformToSearchData(hintItem, userSession)
+                                    if isValid(searchNode) then hintItems.push(searchNode)
+                                end if
+                            end for
+                        end if
+                    else if isValid(data) and isChainValid(data, "Items")
                         for each item in data.Items
                             searchNode = transformToSearchData(item, userSession)
                             if isValid(searchNode)
@@ -99,6 +115,22 @@ sub search()
             end if
         end if
     end while
+
+    ' Hints are the only route a plugin has, and they are merged once every server
+    ' has answered so the fuller item record wins where both found the same thing
+    seenIds = {}
+    for each node in allItems
+        if isValidAndNotEmpty(node.id) then seenIds[node.id] = true
+    end for
+
+    for each node in hintItems
+        if isValidAndNotEmpty(node.id)
+            if seenIds.DoesExist(node.id) then continue for
+            seenIds[node.id] = true
+        end if
+        allItems.push(node)
+        totalCount++
+    end for
 
     results = normalizeSearchResults({
         Items: allItems,
@@ -152,6 +184,17 @@ function startSearchRequest(userSession as object, port as object, searchType as
             EnableTotalRecordCount: false,
             ImageTypeLimit: 1,
             limit: 100
+        })
+    else if searchType = "hints"
+        url = buildURLForSession(userSession, "/Search/Hints", {
+            userId: userSession.userId,
+            searchTerm: query,
+            limit: 100,
+            includePeople: true,
+            includeMedia: true,
+            includeArtists: true,
+            includeGenres: false,
+            includeStudios: false
         })
     end if
 

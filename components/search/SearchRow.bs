@@ -57,10 +57,8 @@ function getData()
             seerrItems.push(item)
         else if isValid(item.type)
             key = groupKeyFor(item.type)
-            if key <> ""
-                if not isValid(buckets[key]) then buckets[key] = []
-                buckets[key].push(item)
-            end if
+            if not isValid(buckets[key]) then buckets[key] = []
+            buckets[key].push(item)
         end if
     end for
 
@@ -69,7 +67,7 @@ function getData()
         summary.push({ key: "seerr", title: "Seerr", count: seerrItems.count() })
     end if
 
-    for each entry in searchGroups.Catalogue()
+    for each entry in searchGroups.DisplayGroups()
         bucket = buckets[entry.key]
         if not isValidAndNotEmpty(bucket) then continue for
 
@@ -83,17 +81,17 @@ function getData()
     if m.top.activeGroup = "seerr"
         appendGrid(data, seerrItems, searchGroups.ASPECT_POSTER)
     else if m.top.activeGroup <> ""
-        for each entry in searchGroups.Catalogue()
+        for each entry in searchGroups.DisplayGroups()
             if entry.key <> m.top.activeGroup then continue for
             if isValidAndNotEmpty(buckets[entry.key])
-                appendGrid(data, buckets[entry.key], searchGroups.AspectFor(entry.types[0]))
+                appendGrid(data, buckets[entry.key], searchGroups.AspectForGroup(entry))
             end if
         end for
     else
-        for each entry in searchGroups.Catalogue()
+        for each entry in searchGroups.DisplayGroups()
             if not isValidAndNotEmpty(buckets[entry.key]) then continue for
 
-            appendRow(data, entry.title, buckets[entry.key], searchGroups.AspectFor(entry.types[0]))
+            appendRow(data, entry.title, buckets[entry.key], searchGroups.AspectForGroup(entry))
         end for
 
         if seerrItems.count() > 0
@@ -108,14 +106,19 @@ function getData()
 end function
 
 function groupKeyFor(itemType as string) as string
-    lowered = LCase(itemType)
-    for each entry in searchGroups.Catalogue()
-        for each candidate in entry.types
-            if lowered = candidate then return entry.key
+    if not isValid(m.groupKeysByType)
+        m.groupKeysByType = {}
+        for each entry in searchGroups.Catalogue()
+            for each candidate in entry.types
+                m.groupKeysByType[candidate] = entry.key
+            end for
         end for
-    end for
+    end if
 
-    return ""
+    key = m.groupKeysByType[LCase(itemType)]
+    if isValid(key) then return key
+
+    return searchGroups.OTHER_KEY
 end function
 
 ' The same title can come back more than once across libraries, so only the

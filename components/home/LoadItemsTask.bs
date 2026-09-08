@@ -684,6 +684,52 @@ function loadSinceYouWatchedOnline(seed as object) as object
     return results
 end function
 
+' Jellyfin 12 picks the similarity provider per library, so the server mode takes
+' the server's own answer instead of scoring candidates here.
+function loadSinceYouWatchedServer(seed as object) as object
+    seedId = seed.LookupCI("Id")
+    if not isValidAndNotEmpty(seedId) then return []
+
+    data = api.items.GetSimilar(seedId, {
+        userId: m.global.session.user.id,
+        limit: 15,
+        fields: "UserData,OfficialRating,ProductionYear,PremiereDate,ImageTags,SeriesPrimaryImageTag,BackdropImageTags"
+    })
+
+    if not isChainValid(data, "Items") then return []
+
+    results = []
+    for each item in data.Items
+        results.Push(makeHomeItem(item))
+    end for
+    return results
+end function
+
+' Hybrid leads with the server answer and tops the row up from local scoring.
+function mergeHomeItems(primary as object, secondary as object, limit as integer) as object
+    merged = []
+    seen = {}
+    sources = [primary, secondary]
+
+    for each list in sources
+        if not isValidAndNotEmpty(list) then continue for
+
+        for each node in list
+            if merged.Count() >= limit then exit for
+
+            id = chainLookupReturn(node, "json.Id", "")
+            if id <> ""
+                if seen.DoesExist(id) then continue for
+                seen[id] = true
+            end if
+
+            merged.Push(node)
+        end for
+    end for
+
+    return merged
+end function
+
 ' Builds one Since You Watched row seeded from the Nth recently watched item.
 function loadSinceYouWatched() as object
     settings = m.global.session.user.settings
@@ -708,9 +754,16 @@ function loadSinceYouWatched() as object
     meta.seedName = seed.LookupCI("Name")
     m.top.metadata = meta
 
-    if LCase(sourceMode) = "online"
+    mode = LCase(sourceMode)
+
+    if mode = "online"
         onlineItems = loadSinceYouWatchedOnline(seed)
         if isValidAndNotEmpty(onlineItems) then return onlineItems
+    else if mode = "server"
+        serverItems = loadSinceYouWatchedServer(seed)
+        if isValidAndNotEmpty(serverItems) then return serverItems
+    else if mode = "hybrid"
+        return mergeHomeItems(loadSinceYouWatchedServer(seed), loadSinceYouWatchedLocal(seed, sourceType, includeWatched), 15)
     end if
 
     return loadSinceYouWatchedLocal(seed, sourceType, includeWatched)

@@ -7,6 +7,8 @@ namespace searchGroups
 
     const RESULT_CAP = 24
 
+    const OTHER_KEY = "other"
+
     const ASPECT_POSTER = "poster"
     const ASPECT_WIDE = "wide"
     const ASPECT_SQUARE = "square"
@@ -33,6 +35,21 @@ namespace searchGroups
             { key: "people", title: tr("People"), types: ["person"] },
             { key: "folders", title: tr("Folders"), types: ["folder", "collectionfolder", "userview"] }
         ]
+    end function
+
+    ' Plugins can return a type no group in the catalogue claims, so display runs
+    ' over the catalogue plus a bucket that takes whatever is left.
+    function DisplayGroups() as object
+        groups = searchGroups.Catalogue()
+        groups.push({ key: searchGroups.OTHER_KEY, title: tr("Other"), types: [] })
+        return groups
+    end function
+
+    ' The catch-all group names no type of its own, so it falls back to a poster
+    function AspectForGroup(entry as object) as string
+        if not isValid(entry) or not isValidAndNotEmpty(entry.types) then return searchGroups.ASPECT_POSTER
+
+        return searchGroups.AspectFor(entry.types[0])
     end function
 
     ' Sixteen by nine for the video shaped types, square for music and people,
