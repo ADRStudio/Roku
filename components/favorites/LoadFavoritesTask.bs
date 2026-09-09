@@ -88,10 +88,7 @@ sub loadFavorites()
                                 totalItemCount++
                             end if
                         end for
-                        print "[FavoritesTask] Server "; userSession.serverUrl; " returned "; data.Items.Count(); " favorites"
                     end if
-                else
-                    print "[FavoritesTask] Server "; userSession.serverUrl; " returned "; responseCode
                 end if
             end if
         end if
@@ -119,8 +116,6 @@ function startFavoritesRequest(userSession as object, port as object) as object
 
     url = buildURLForSession(userSession, "/Users/" + userSession.userId + "/Items", params)
     authHeader = buildAuthHeaderForSession(userSession)
-
-    print "[FavoritesTask] Starting request to "; userSession.serverUrl
 
     request = CreateObject("roUrlTransfer")
     request.SetUrl(url)

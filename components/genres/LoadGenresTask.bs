@@ -80,10 +80,7 @@ sub loadGenreItems()
                         ' Process items and add to genre map
                         itemCount = processServerItems(data.Items, userSession, genreMap)
                         totalItemCount += itemCount
-                        print "[GenresTask] Server "; userSession.serverUrl; " returned "; data.Items.Count(); " items"
                     end if
-                else
-                    print "[GenresTask] Server "; userSession.serverUrl; " returned "; responseCode
                 end if
             end if
         end if
@@ -119,8 +116,6 @@ function startGenreRequest(userSession as object, port as object) as object
 
     url = buildURLForSession(userSession, "/Users/" + userSession.userId + "/Items", params)
     authHeader = buildAuthHeaderForSession(userSession)
-
-    print "[GenresTask] Starting request to "; userSession.serverUrl
 
     request = CreateObject("roUrlTransfer")
     request.SetUrl(url)
