@@ -1,0 +1,529 @@
+import "pkg:/source/api/baserequest.bs"
+import "pkg:/source/utils/buttonLayout.bs"
+import "pkg:/source/utils/detailActions.bs"
+import "pkg:/source/utils/detailButtons.bs"
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/seerrButtons.bs"
+import "pkg:/source/utils/seerrDetailHost.bs"
+
+import "pkg:/source/enums/SubtitleSelection.bs"
+import "pkg:/source/enums/TaskControl.bs"
+import "pkg:/source/enums/ViewLoadStatus.bs"
+
+' The action row, shared by the classic and modern detail screens so both behave the
+' same. These run in the host screen's scope, so m is whichever screen imported them.
+' Each screen keeps its own init() and node observers, this file has none.
+'
+' Hooks each screen provides:
+'   sub appendButtonNode(config as object)
+'   sub clearButtonRow()
+'   sub commitButtonRow()
+'   function typeSpecificButtons() as boolean
+'   function markActiveButton(config as object, isActive as boolean, ink as string) as object
+'   sub setToggleButtonLabel(buttonId as string, label as string, isActive as boolean)
+'   sub handleScreenButtonAction(action as string)
+'   sub highlightButton(index as integer)
+'   sub toggleMoreActions()
+'   sub updatePlayedIndicator()
+
+sub addArrangedButtons(candidates as object)
+    order = m.global.session.user.settings[DETAIL_ORDER_SETTING]
+    hidden = m.global.session.user.settings[DETAIL_HIDDEN_SETTING]
+
+    for each candidate in seerrButtons.Candidates(m.seerrDetails, seerrMediaType())
+        candidates.push(candidate)
+    end for
+
+    for each candidate in detailActionCandidates(m.top.itemContent.json)
+        candidates.push(candidate)
+    end for
+
+    for each candidate in buttonLayout.Arrange(buttonLayout.InCatalogueOrder(candidates), order, hidden)
+        addButton(candidate.config)
+    end for
+end sub
+
+function moreButtonConfig() as object
+    return {
+        icon: m.actionsExpanded ? "pkg:/images/icons/chevron-up.png" : "pkg:/images/icons/chevron-down.png",
+        label: m.actionsExpanded ? tr("Less") : tr("More"),
+        action: "toggleMoreActions",
+        id: "moreActionsButton"
+    }
+end function
+
+sub onButtonFocusChanged(event as object)
+    button = event.getRoSGNode()
+    if button <> invalid and button.buttonIndex <> invalid
+        if button.hasFocus() or button.isInFocusChain()
+            m.currentButtonIndex = button.buttonIndex
+            highlightButton(m.currentButtonIndex)
+        end if
+    end if
+end sub
+
+sub focusButton(index as integer)
+    if index < 0 or index >= m.buttonGroups.count() then return
+
+    m.buttonGroups[index].setFocus(true)
+    m.top.lastFocus = m.buttonGroups[index]
+    m.currentButtonIndex = index
+    highlightButton(index)
+    setLastFocus(m.buttonGroups[index])
+end sub
+
+sub focusFirstButton()
+    if m.buttonGroups.count() > 0
+        m.buttonGroups[0].setFocus(true)
+        highlightButton(0)
+    end if
+end sub
+
+sub focusFirstVisibleButton()
+    firstVisibleIndex = 0
+    for i = 0 to m.buttonGroups.count() - 1
+        if m.buttonGroups[i].visible
+            firstVisibleIndex = i
+            exit for
+        end if
+    end for
+
+    if firstVisibleIndex < m.buttonGroups.count()
+        m.currentButtonIndex = firstVisibleIndex
+        m.buttonGroups[firstVisibleIndex].setFocus(true)
+        highlightButton(firstVisibleIndex)
+        setLastFocus(m.buttonGroups[firstVisibleIndex])
+    end if
+end sub
+
+' The Seerr payload lands after the row is first drawn, so it is drawn again with the
+' Seerr entries in, keeping focus where it was rather than snapping to the front
+sub onSeerrButtonsStale()
+    hadFocus = false
+    focusIndex = 0
+    for i = 0 to m.buttonGroups.count() - 1
+        if m.buttonGroups[i].isInFocusChain()
+            hadFocus = true
+            focusIndex = i
+            exit for
+        end if
+    end for
+
+    clearButtonRow()
+    addButtons(m.top.itemContent.json)
+    commitButtonRow()
+
+    if hadFocus and m.buttonGroups.count() > 0
+        if focusIndex >= m.buttonGroups.count() then focusIndex = m.buttonGroups.count() - 1
+        m.currentButtonIndex = focusIndex
+        m.buttonGroups[focusIndex].setFocus(true)
+        highlightButton(focusIndex)
+    end if
+end sub
+
+sub updateButtonVisibility(itemData as object)
+    clearButtonRow()
+    m.actionsExpanded = false
+
+    addButtons(itemData)
+    commitButtonRow()
+
+    if m.buttonGroups.count() > 0
+        m.currentButtonIndex = 0
+        timer = CreateObject("roSGNode", "Timer")
+        timer.duration = 0.05
+        timer.repeat = false
+        timer.observeField("fire", "focusFirstButton")
+        timer.control = "start"
+        m.focusTimer = timer
+    end if
+end sub
+
+sub addButton(config as object)
+    ' A Seerr title has nothing in the library behind it, so only the actions that reach
+    ' Seerr itself are worth offering
+    if m.top.seerrOnly and Left(config.id, 5) <> "seerr" then return
+    appendButtonNode(config)
+end sub
+
+sub addButtons(itemData as object)
+    if isSeries()
+        addSeriesButtons()
+        return
+    end if
+
+    if typeSpecificButtons() then return
+
+    positionTicks = 0&
+    if isValid(itemData.UserData) and itemData.UserData.PlaybackPositionTicks > 0
+        positionTicks = itemData.UserData.PlaybackPositionTicks
+    end if
+    hasProgress = positionTicks > 0
+
+    if hasProgress
+        addButton({
+            icon: "pkg:/images/icons/detail_play.png",
+            label: tr("Resume"),
+            detail: getFormattedRuntime(positionTicks),
+            action: "resume",
+            id: "resumeButton"
+        })
+    end if
+
+    ' With a resume point on offer the second button starts over instead, which
+    ' is how the other clients pair the two
+    addButton({
+        icon: hasProgress ? "pkg:/images/icons/detail_restart.png" : "pkg:/images/icons/detail_play.png",
+        label: hasProgress ? tr("Restart") : tr("Play"),
+        action: hasProgress ? "restart" : "play",
+        id: hasProgress ? "restartButton" : "playButton"
+    })
+
+    ' Pushed in the catalogue's order, since that is what decides where a button
+    ' the user never placed ends up
+    candidates = []
+
+    if isValid(itemData.MediaSources) and itemData.MediaSources.Count() > 1
+        candidates.push({ id: "version", config: {
+            icon: "pkg:/images/icons/detail_version.png",
+            label: tr("Versions"),
+            action: "versionTrack",
+            id: "versionButton"
+        } })
+    end if
+
+    if isValid(itemData.MediaStreams)
+        audioCount = 0
+        for each stream in itemData.MediaStreams
+            if stream.Type = "Audio" then audioCount++
+        end for
+        if audioCount > 1
+            candidates.push({ id: "audio", config: {
+                icon: "pkg:/images/icons/detail_audio.png",
+                label: tr("Audio"),
+                action: "audioTrack",
+                id: "audioTrackButton"
+            } })
+        end if
+    end if
+
+    candidates.push({ id: "subtitles", config: {
+        icon: "pkg:/images/icons/detail_subtitle.png",
+        label: tr("Subtitle"),
+        action: "subtitleTrack",
+        id: "subtitleButton"
+    } })
+
+    if m.top.trailerAvailable
+        candidates.push({ id: "trailer", config: {
+            icon: "pkg:/images/icons/detail_trailer.png",
+            label: tr("Trailer"),
+            action: "trailer",
+            id: "trailerButton"
+        } })
+    end if
+
+    isWatched = chainLookupReturn(itemData, "UserData.Played", false)
+    candidates.push({ id: "watched", config: markActiveButton({
+        icon: "pkg:/images/icons/detail_watched.png",
+        label: isWatched ? tr("Watched") : tr("Unwatched"),
+        action: "watched",
+        id: "watchedButton"
+    }, isWatched, CLASSIC_WATCHED_INK) })
+
+    isFavorited = chainLookupReturn(itemData, "UserData.IsFavorite", false)
+    candidates.push({ id: "favorite", config: markActiveButton({
+        icon: "pkg:/images/icons/detail_favorite.png",
+        label: isFavorited ? tr("Favorited") : tr("Favorite"),
+        action: "favorite",
+        id: "favoriteButton"
+    }, isFavorited, CLASSIC_FAVORITE_INK) })
+
+    if isEpisode()
+        candidates.push({ id: "goToSeries", config: {
+            icon: "pkg:/images/icons/detail_series.png",
+            label: tr("Go to Series"),
+            action: "goToSeries",
+            id: "goToSeriesButton"
+        } })
+    end if
+
+    addArrangedButtons(candidates)
+end sub
+
+sub addSeriesButtons()
+    hasResume = m.top.displayResumeButton
+    if hasResume
+        addButton({
+            icon: "pkg:/images/icons/detail_play.png",
+            label: tr("Resume"),
+            action: "seriesResume",
+            id: "resumeButton"
+        })
+    end if
+
+    ' With a resume point on offer the second button starts over instead, which
+    ' is how the other clients pair the two
+    addButton({
+        icon: hasResume ? "pkg:/images/icons/detail_restart.png" : "pkg:/images/icons/detail_play.png",
+        label: hasResume ? tr("Restart") : tr("Play"),
+        action: "seriesPlay",
+        id: "playButton"
+    })
+
+    isWatched = chainLookupReturn(m.top.itemContent, "json.UserData.Played", false)
+    isFavorited = chainLookupReturn(m.top.itemContent, "json.UserData.IsFavorite", false)
+
+    candidates = []
+    candidates.push({ id: "shuffle", config: {
+        icon: "pkg:/images/icons/detail_shuffle.png",
+        label: tr("Shuffle"),
+        action: "seriesShuffle",
+        id: "shuffleButton"
+    } })
+
+    if m.top.trailerAvailable
+        candidates.push({ id: "trailer", config: {
+            icon: "pkg:/images/icons/detail_trailer.png",
+            label: tr("Trailer"),
+            action: "trailer",
+            id: "trailerButton"
+        } })
+    end if
+
+    candidates.push({ id: "watched", config: markActiveButton({
+        icon: "pkg:/images/icons/detail_watched.png",
+        label: isWatched ? tr("Watched") : tr("Unwatched"),
+        action: "watched",
+        id: "watchedButton"
+    }, isWatched, CLASSIC_WATCHED_INK) })
+
+    candidates.push({ id: "favorite", config: markActiveButton({
+        icon: "pkg:/images/icons/detail_favorite.png",
+        label: isFavorited ? tr("Favorited") : tr("Favorite"),
+        action: "favorite",
+        id: "favoriteButton"
+    }, isFavorited, CLASSIC_FAVORITE_INK) })
+
+    addArrangedButtons(candidates)
+end sub
+
+sub handleButtonSelect()
+    if m.currentButtonIndex < 0 or m.currentButtonIndex >= m.buttonGroups.count() then return
+
+    buttonGroup = m.buttonGroups[m.currentButtonIndex]
+    if buttonGroup = invalid then return
+
+    buttonAction = buttonGroup.buttonAction
+    if buttonAction = invalid then return
+
+    if Left(buttonAction, 5) = "seerr"
+        startSeerrRequest(buttonAction)
+        return
+    end if
+
+    if buttonAction = "toggleMoreActions"
+        toggleMoreActions()
+        return
+    end if
+
+    m.loadStatus = ViewLoadStatus.RELOAD
+
+    if buttonAction = "resume"
+        startLoadingSpinner()
+        itemContent = m.top.itemContent
+        if itemContent <> invalid and isValid(itemContent.json)
+            playbackPositionTicks = chainLookup(itemContent, "json.UserData.PlaybackPositionTicks") ?? 0
+            itemContent.startingPoint = playbackPositionTicks
+            itemContent.id = m.top.selectedVideoStreamId
+            itemContent.selectedAudioStreamIndex = m.top.selectedAudioStreamIndex
+            m.global.queueManager.callFunc("clear")
+            m.global.queueManager.callFunc("push", itemContent)
+            m.global.queueManager.callFunc("playQueue")
+        end if
+    else if buttonAction = "play"
+        m.top.buttonSelected = "play-button"
+    else if buttonAction = "restart"
+        m.top.buttonSelected = "playFromBeginning-button"
+    else if buttonAction = "trailer"
+        m.top.buttonSelected = "trailer-button"
+    else if buttonAction = "audioTrack"
+        if isValid(m.trackData.audios)
+            m.audioSelector.audioTracks = m.trackData.audios
+            m.audioSelector.visible = true
+            m.audioSelector.setFocus(true)
+            setLastFocus(m.audioSelector)
+        end if
+    else if buttonAction = "subtitleTrack"
+        subtitleTracks = invalid
+        if isValid(m.trackData)
+            subtitleTracks = m.trackData.subtitles
+        end if
+
+        if not isValid(subtitleTracks)
+            preferredSubtitle = m.global.queueManager.callFunc("getPreferredSubtitleTrack")
+            selectedSubtitle = isChainValid(preferredSubtitle, "StreamIndex") ? preferredSubtitle.StreamIndex : SubtitleSelection.NONE
+            subtitleTracks = [{
+                "StreamIndex": SubtitleSelection.NONE,
+                "json": {},
+                "Title": "None",
+                "Description": "None",
+                "Selected": selectedSubtitle = SubtitleSelection.NONE
+            }]
+        end if
+
+        m.subtitleSelector.subtitleTracks = subtitleTracks
+        m.subtitleSelector.visible = true
+        m.subtitleSelector.setFocus(true)
+        setLastFocus(m.subtitleSelector)
+    else if buttonAction = "watched"
+        toggleWatched()
+    else if buttonAction = "personalRating"
+        showRatingPrompt()
+    else if buttonAction = "addToPlaylist"
+        showPlaylistPicker()
+    else if buttonAction = "addToCollection"
+        showCollectionPicker()
+    else if buttonAction = "deleteItem"
+        confirmDelete()
+    else if buttonAction = "changeArtwork"
+        showArtworkPicker()
+    else if buttonAction = "adminControls"
+        showIdentify()
+    else if buttonAction = "goToSeries"
+        m.top.buttonSelected = "goToSeries-button"
+    else if buttonAction = "favorite"
+        toggleFavorite()
+    else if buttonAction = "versionTrack"
+        if isValid(m.trackData.videos)
+            m.versionSelector.videoTracks = m.trackData.videos
+            m.versionSelector.visible = true
+            m.versionSelector.setFocus(true)
+            setLastFocus(m.versionSelector)
+        end if
+    else if buttonAction = "seriesResume"
+        itemContent = m.top.itemContent
+        if isValid(itemContent)
+            itemContent.quickplayFromResume = true
+            m.top.quickPlayNode = itemContent
+        end if
+    else if buttonAction = "seriesPlay"
+        m.top.playSeriesFromStart = not m.top.playSeriesFromStart
+    else if buttonAction = "seriesShuffle"
+        if isValid(m.top.itemContent) and isValid(m.top.itemContent.id)
+            m.getShuffleEpisodesTask.showID = m.top.itemContent.id
+            m.getShuffleEpisodesTask.observeField("data", "onShuffleEpisodeDataLoaded")
+            m.getShuffleEpisodesTask.control = "RUN"
+        end if
+    else
+        handleScreenButtonAction(buttonAction)
+    end if
+end sub
+
+sub toggleWatched()
+    itemContent = m.top.itemContent
+    if itemContent = invalid or not isValid(itemContent.json) then return
+
+    itemData = itemContent.json
+    currentWatched = false
+    if hasValidProperties(itemData, "UserData", "Played")
+        currentWatched = itemData.UserData.Played
+    end if
+
+    newWatchedState = not currentWatched
+
+    itemServerInfo = getServerInfoFromItem(itemContent)
+    taskParams = {}
+
+    if newWatchedState
+        date = CreateObject("roDateTime")
+        dateStr = date.ToISOString()
+        taskParams["DatePlayed"] = dateStr
+        taskParams["PlaybackPositionTicks"] = 0
+        if isValid(itemServerInfo) and isValidAndNotEmpty(itemServerInfo.serverUrl)
+            taskParams["serverData"] = {
+                serverUrl: itemServerInfo.serverUrl,
+                userId: itemServerInfo.userId,
+                authToken: itemServerInfo.authToken
+            }
+        end if
+        m.playstateTask.status = "markPlayed"
+        m.playstateTask.itemId = itemData.id
+        m.playstateTask.params = taskParams
+        m.playstateTask.control = TaskControl.RUN
+        itemData.UserData.PlaybackPositionTicks = 0
+    else
+        if isValid(itemServerInfo) and isValidAndNotEmpty(itemServerInfo.serverUrl)
+            taskParams["serverData"] = {
+                serverUrl: itemServerInfo.serverUrl,
+                userId: itemServerInfo.userId,
+                authToken: itemServerInfo.authToken
+            }
+        end if
+        m.playstateTask.status = "unmarkPlayed"
+        m.playstateTask.itemId = itemData.id
+        m.playstateTask.params = taskParams
+        m.playstateTask.control = TaskControl.RUN
+    end if
+
+    itemData.UserData.Played = newWatchedState
+    itemContent.watched = newWatchedState
+    ' json is a node field, so the read handed back a copy and nothing else sees the change
+    ' until it goes back
+    itemContent.json = itemData
+
+    updatePlayedIndicator()
+
+    setToggleButtonLabel("watchedButton", newWatchedState ? tr("Watched") : tr("Unwatched"), newWatchedState)
+
+    if m.buttonGroups.count() > 0 and m.currentButtonIndex >= 0 and m.currentButtonIndex < m.buttonGroups.count()
+        highlightButton(m.currentButtonIndex)
+    end if
+end sub
+
+sub toggleFavorite()
+    itemContent = m.top.itemContent
+    if itemContent = invalid or not isValid(itemContent.json) then return
+
+    itemData = itemContent.json
+    currentFavorite = false
+    if hasValidProperties(itemData, "UserData", "IsFavorite")
+        currentFavorite = itemData.UserData.IsFavorite
+    end if
+
+    newFavoriteState = not currentFavorite
+
+    itemServerInfo = getServerInfoFromItem(itemContent)
+    if isValid(itemServerInfo) and isValidAndNotEmpty(itemServerInfo.serverUrl)
+        m.favoriteTask.serverData = {
+            serverUrl: itemServerInfo.serverUrl,
+            userId: itemServerInfo.userId,
+            authToken: itemServerInfo.authToken
+        }
+    else
+        m.favoriteTask.serverData = invalid
+    end if
+
+    if newFavoriteState
+        m.favoriteTask.favTask = "favorite"
+    else
+        m.favoriteTask.favTask = "unfavorite"
+    end if
+    m.favoriteTask.itemId = itemData.id
+    m.favoriteTask.control = TaskControl.RUN
+
+    if not isValid(itemData.UserData)
+        itemData.UserData = {}
+    end if
+    itemData.UserData.IsFavorite = newFavoriteState
+    itemContent.favorite = newFavoriteState
+    itemContent.json = itemData
+
+    updatePlayedIndicator()
+
+    setToggleButtonLabel("favoriteButton", newFavoriteState ? tr("Favorited") : tr("Favorite"), newFavoriteState)
+
+    if m.buttonGroups.count() > 0 and m.currentButtonIndex >= 0 and m.currentButtonIndex < m.buttonGroups.count()
+        highlightButton(m.currentButtonIndex)
+    end if
+end sub

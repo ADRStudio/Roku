@@ -1,0 +1,143 @@
+import "pkg:/source/utils/misc.bs"
+
+import "pkg:/source/enums/String.bs"
+import "pkg:/source/enums/ViewLoadStatus.bs"
+
+' Item type checks, page scrolling and the small field observers, shared by the
+' classic and modern detail screens so both behave the same. These run in the host
+' screen's scope, so m is whichever screen imported them. Each screen keeps its own
+' init() and node observers, this file has none.
+'
+' Hooks each screen provides:
+'   function contentScrollOffset() as integer
+'   sub scrollToSeerrFocus()
+'   sub applyBackdropTreatment()
+'   sub layoutContainer()
+'   sub updateButtonVisibility(itemData as object)
+'   sub focusFirstVisibleButton()
+
+function isEpisode() as boolean
+    return LCase(m.top.itemType) = "episode"
+end function
+
+function isSeries() as boolean
+    return LCase(m.top.itemType) = "series"
+end function
+
+sub onSelectedPartChanged()
+    if not isValid(m.top.selectedPart) then return
+    m.global.queueManager.callFunc("setLastKnownItemID", m.top.selectedPart.id)
+    m.loadStatus = ViewLoadStatus.FIRSTLOAD
+    m.global.queueManager.callFunc("setLastKnownItemExtraType", string.EMPTY)
+
+    if isEpisode()
+        m.top.refreshEpisodeDetailsData = not m.top.refreshEpisodeDetailsData
+    else
+        m.top.refreshMovieDetailsData = not m.top.refreshMovieDetailsData
+    end if
+end sub
+
+sub onDisplayResumeButtonChange()
+    if isValid(m.top.itemContent) and isChainValid(m.top.itemContent, "json")
+        updateButtonVisibility(m.top.itemContent.json)
+    end if
+end sub
+
+sub onShuffleEpisodeDataLoaded()
+    m.getShuffleEpisodesTask.unobserveField("data")
+    m.global.queueManager.callFunc("set", m.getShuffleEpisodesTask.data.items)
+    m.global.queueManager.callFunc("playQueue")
+end sub
+
+' Laying out sets the overview's width, which can settle it at a new height and
+' ask for the layout again, so the second pass is left to the first one
+sub onOverviewHeightChanged()
+    if m.layingOut = true then return
+
+    layoutContainer()
+end sub
+
+function overviewCanScroll() as boolean
+    return isValid(m.overview) and m.overview.visible and m.overview.canToggle
+end function
+
+sub scrollContentTo(targetY as integer)
+    if m.scrollAnim = invalid or m.scrollInterp = invalid or m.scrollableContent = invalid then return
+    m.scrollAnim.control = "stop"
+    m.scrollInterp.keyValue = [[0, m.currentScrollY], [0, targetY]]
+    m.currentScrollY = targetY
+    m.scrollAnim.control = "start"
+end sub
+
+sub onExtrasRowChanged()
+    ' Only scroll the page when first entering the extras area.
+    ' The RowList's built-in floatingFocus handles row-level scrolling.
+    if m.extrasGrid = invalid or not m.extrasGrid.isInFocusChain() then return
+
+    target = contentScrollOffset()
+    if m.currentScrollY <> target
+        scrollContentTo(target)
+    end if
+end sub
+
+sub onSeerrFocusMoved()
+    if not m.seerrBlock.isInFocusChain() then return
+    scrollToSeerrFocus()
+end sub
+
+sub OnScreenShown(_isReturning = false as boolean)
+    ' Runs on first show and on return, so a change made in settings is picked up either way
+    applyBackdropTreatment()
+
+    picker = openTrackPicker()
+    if isValid(picker)
+        picker.setFocus(true)
+    else if _isReturning and isValid(m.top.lastFocus)
+        m.top.lastFocus.setFocus(true)
+        setLastFocus(m.top.lastFocus)
+
+        if isValid(m.extrasGrid) and m.top.lastFocus.isSameNode(m.extrasGrid)
+            scrollContentTo(contentScrollOffset())
+        else
+            scrollContentTo(0)
+        end if
+    else
+        focusFirstVisibleButton()
+    end if
+
+    if m.loadStatus = ViewLoadStatus.RELOAD
+        if not isSeries()
+            if isChainValid(m.top.itemContent, "json.mediaStreams")
+                SetDefaultAudioTrack(m.top.itemContent.json)
+                SetUpAudioOptions(m.top.itemContent.json.mediaStreams)
+            end if
+            if isChainValid(m.top.itemContent, "json.mediaSources")
+                SetUpVideoOptions(m.top.itemContent.json.mediaSources)
+            end if
+        end if
+    end if
+
+    if m.loadStatus = ViewLoadStatus.INIT
+        m.loadStatus = ViewLoadStatus.FIRSTLOAD
+        return
+    end if
+
+    m.loadStatus = ViewLoadStatus.RELOAD
+
+    if isEpisode()
+        m.top.refreshEpisodeDetailsData = not m.top.refreshEpisodeDetailsData
+    else if isSeries()
+        m.top.refreshSeriesDetailsData = not m.top.refreshSeriesDetailsData
+    else
+        m.top.refreshMovieDetailsData = not m.top.refreshMovieDetailsData
+    end if
+end sub
+
+' Theme music runs on its own audio node, which holds the media pipeline. Leaving it going
+' when the video player is created stalls or fails playback, so it stops whenever this
+' screen goes away, whichever route the viewer took
+sub OnScreenHidden()
+    if isValid(m.themeMusicPlayer)
+        m.themeMusicPlayer.callFunc("stopMusic")
+    end if
+end sub

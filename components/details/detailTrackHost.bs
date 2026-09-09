@@ -1,0 +1,277 @@
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/remoteSubtitles.bs"
+
+import "pkg:/source/enums/MediaStreamType.bs"
+import "pkg:/source/enums/PlaybackMethod.bs"
+import "pkg:/source/enums/String.bs"
+import "pkg:/source/enums/SubtitleSelection.bs"
+import "pkg:/source/enums/VideoType.bs"
+
+' The audio, subtitle and version pickers, shared by the classic and modern detail
+' screens so both behave the same. These run in the host screen's scope, so m is
+' whichever screen imported them. Each screen keeps its own init() and node
+' observers, this file has none.
+'
+' Hooks each screen provides:
+'   sub buildStreamSummary(itemData as object)
+'   sub refreshAfterVersionChange()
+
+sub SetUpVideoOptions(streams)
+    videos = []
+
+    for i = 0 to streams.Count() - 1
+        if LCase(streams[i].VideoType) = VideoType.VIDEOFILE
+            videoCodecForDisplay = ""
+            codec = ""
+            if isValidAndNotEmpty(streams[i].mediaStreams)
+                for index = 0 to streams[i].mediaStreams.Count() - 1
+                    if LCase(streams[i].mediaStreams[index].Type) = MediaStreamType.VIDEO
+                        if m.performRotationCheck
+                            rotation = chainLookupReturn(streams[i].mediaStreams[index], "rotation", 0)
+                            if rotation <> 0
+                                m.global.queueManager.callFunc("setForceTranscode", PlaybackMethod.FORCETRANSCODEALLOWREMUX)
+                            end if
+                        end if
+                        exit for
+                    end if
+                end for
+                videoCodecForDisplay = streams[i].mediaStreams[0].displayTitle
+                codec = streams[i].mediaStreams[0].Codec
+            end if
+
+            videos.push({
+                "Title": streams[i].Name,
+                "Description": tr("Video"),
+                "Selected": m.top.selectedVideoStreamId = streams[i].id,
+                "StreamID": streams[i].id,
+                "video_codec": videoCodecForDisplay,
+                "codec": codec
+            })
+        end if
+    end for
+
+    m.trackData.videos = videos
+end sub
+
+sub SetUpAudioOptions(streams)
+    preferredSubtitle = m.global.queueManager.callFunc("getPreferredSubtitleTrack")
+    selectedSubtitle = isChainValid(preferredSubtitle, "StreamIndex") ? preferredSubtitle.StreamIndex : SubtitleSelection.NONE
+
+    audioTracks = []
+    subtitleTracks = [{
+        "StreamIndex": SubtitleSelection.NONE,
+        "json": {},
+        "Title": "None",
+        "Description": "None",
+        "Selected": selectedSubtitle = SubtitleSelection.NONE
+    }]
+
+    audioStreamCount = 1
+    for i = 0 to streams.Count() - 1
+        if streams[i].Type = "Audio"
+            rokuTrackName = `#uniq:${streams[i].LookupCI("Title") ?? string.EMPTY}(${audioStreamCount})`
+            audioTracks.push({ "Title": streams[i].displayTitle, "Description": streams[i].Title, "Selected": m.top.selectedAudioStreamIndex = i, "StreamIndex": i, "RokuTrackName": rokuTrackName, "Language": streams[i].Language, "Codec": streams[i].Codec, "Channels": streams[i].Channels })
+            audioStreamCount++
+        end if
+        if streams[i].Type = "Subtitle"
+            subtitleTracks.push({ "Title": streams[i].displayTitle, "json": streams[i], "Description": streams[i].Title, "Selected": selectedSubtitle = streams[i].index, "StreamIndex": i })
+        end if
+    end for
+
+    m.trackData.audios = audioTracks
+    m.trackData.subtitles = subtitleTracks
+end sub
+
+sub SetDefaultAudioTrack(itemData)
+    preferredAudioTrackIndex = m.global.queueManager.callFunc("getPreferredAudioTrackIndex")
+    preferredAudioTrackName = m.global.queueManager.callFunc("getPreferredAudioTrackName")
+    preferredLanguage = getPreferredLanguage("playback.audioPreferredLanguage")
+    firstAudioTrack = -1
+
+    defaultAudioTrackIndex = getDefaultAudioTrackIndex(itemData.mediaStreams)
+    defaultAudioTrackName = string.EMPTY
+
+    if preferredAudioTrackIndex < 0 and chainLookupReturn(m.global.session, "user.settings.`playback.playDefaultAudioTrack`", false)
+        preferredAudioTrackIndex = defaultAudioTrackIndex
+    end if
+
+    audioStreamCount = 1
+    for i = 0 to itemData.mediaStreams.Count() - 1
+        if itemData.mediaStreams[i].Type = "Audio"
+            rokuTrackName = `#uniq:${itemData.mediaStreams[i].LookupCI("Title") ?? string.EMPTY}(${audioStreamCount})`
+
+            if firstAudioTrack < 0 then firstAudioTrack = i
+            if i = defaultAudioTrackIndex then defaultAudioTrackName = rokuTrackName
+
+            if i = preferredAudioTrackIndex
+                m.global.queueManager.callFunc("setPreferredAudioTrackName", rokuTrackName)
+                preferredAudioTrackName = rokuTrackName
+            end if
+
+            if preferredAudioTrackIndex < 0 and isValid(preferredLanguage)
+                if isStringEqual(chainLookupReturn(itemData.mediaStreams[i], "Language", invalid), preferredLanguage)
+                    m.top.selectedAudioStreamIndex = i
+                    m.global.queueManager.callFunc("setPreferredAudioTrackName", rokuTrackName)
+                    return
+                end if
+            end if
+
+            if isStringEqual(rokuTrackName, preferredAudioTrackName)
+                m.top.selectedAudioStreamIndex = i
+                return
+            end if
+
+            audioStreamCount++
+        end if
+    end for
+
+    if defaultAudioTrackIndex > -1
+        m.top.selectedAudioStreamIndex = defaultAudioTrackIndex
+        m.global.queueManager.callFunc("setPreferredAudioTrackName", defaultAudioTrackName)
+        return
+    end if
+
+    if firstAudioTrack > -1
+        m.top.selectedAudioStreamIndex = firstAudioTrack
+    end if
+end sub
+
+sub onAudioStreamIndexChanged()
+    if m.audioSelector.audioStreamIndex <> m.top.selectedAudioStreamIndex
+        m.top.selectedAudioStreamIndex = m.audioSelector.audioStreamIndex
+        m.global.queueManager.callFunc("setPreferredAudioTrackIndex", m.audioSelector.audioStreamIndex)
+        m.global.queueManager.callFunc("setPreferredAudioTrackName", m.audioSelector.audioStreamName)
+
+        if isValid(m.top.itemContent)
+            m.top.itemContent.selectedAudioStreamIndex = m.top.selectedAudioStreamIndex
+        end if
+
+        if isValid(m.trackData.audios)
+            for each track in m.trackData.audios
+                track.Selected = (track.StreamIndex = m.top.selectedAudioStreamIndex)
+            end for
+        end if
+    end if
+end sub
+
+sub onSubtitleStreamChanged()
+    if isValid(m.subtitleSelector.subtitleStream)
+        m.global.queueManager.callFunc("setPreferredSubtitleTrack", m.subtitleSelector.subtitleStream)
+        updateSubtitleTrackSelection(m.subtitleSelector.subtitleStream)
+    end if
+end sub
+
+sub onSubtitleDownloadRequested()
+    if not m.subtitleSelector.downloadRequested then return
+
+    m.subtitleSelector.downloadRequested = false
+    itemId = chainLookup(m.top, "itemContent.id")
+    if not isValidAndNotEmpty(itemId) then return
+
+    preferredSubtitle = m.global.queueManager.callFunc("getPreferredSubtitleTrack")
+    subtitleIndex = isChainValid(preferredSubtitle, "StreamIndex") ? preferredSubtitle.StreamIndex : SubtitleSelection.NONE
+
+    m.subtitleDownloadDialog.itemId = itemId
+    m.subtitleDownloadDialog.language = remoteSubtitles.LanguageFor(chainLookupReturn(m.top, "itemContent.json.mediaStreams", []), subtitleIndex, m.top.selectedAudioStreamIndex)
+    m.subtitleDownloadDialog.visible = true
+    m.subtitleDownloadDialog.setFocus(true)
+    m.subtitleDownloadDialog.callFunc("startSearch")
+end sub
+
+sub onAudioSelectorVisibleChanged()
+    if not m.audioSelector.visible
+        restoreFocusToButtons()
+    end if
+end sub
+
+sub onSubtitleSelectorVisibleChanged()
+    if not m.subtitleSelector.visible
+        restoreFocusToButtons()
+    end if
+end sub
+
+sub onSubtitleDownloadDialogVisibleChanged()
+    if not m.subtitleDownloadDialog.visible
+        restoreFocusToButtons()
+    end if
+end sub
+
+sub onVersionSelectorVisibleChanged()
+    if not m.versionSelector.visible
+        restoreFocusToButtons()
+    end if
+end sub
+
+sub onVersionSelected()
+    newStreamId = m.versionSelector.videoStreamId
+    if newStreamId <> m.top.selectedVideoStreamId
+        m.top.selectedVideoStreamId = newStreamId
+        m.currentCodec = m.versionSelector.codec
+        m.top.unobservefield("itemContent")
+        itemData = m.top.itemContent.json
+        for each mediaSource in itemData.mediaSources
+            if mediaSource.id = newStreamId
+                itemData.mediaStreams = []
+                for i = 0 to mediaSource.mediaStreams.Count() - 1
+                    itemData.mediaStreams.push(mediaSource.mediaStreams[i])
+                end for
+                if isValid(mediaSource.RunTimeTicks)
+                    itemData.RunTimeTicks = mediaSource.RunTimeTicks
+                end if
+                SetDefaultAudioTrack(itemData)
+                SetUpAudioOptions(itemData.mediaStreams)
+                exit for
+            end if
+        end for
+        m.top.itemContent.json = itemData
+        m.top.observeField("itemContent", "itemContentChanged")
+
+        populateRuntime(itemData)
+        buildStreamSummary(itemData)
+        refreshAfterVersionChange()
+
+        updateVideoTrackSelection(newStreamId)
+
+        if isStringEqual(PlaybackMethod.FORCETRANSCODEDISABLEREMUX, m.global.session.user.settings["playback.media.forceTranscode"] ?? PlaybackMethod.PLAYNORMALLY)
+            m.global.queueManager.callFunc("setForceTranscode", PlaybackMethod.FORCETRANSCODEDISABLEREMUX, m.currentCodec)
+        end if
+    end if
+end sub
+
+sub updateSubtitleTrackSelection(selectedSubtitle as object)
+    if not isValid(m.trackData.subtitles) then return
+
+    selectedIndex = chainLookupReturn(selectedSubtitle, "StreamIndex", SubtitleSelection.NONE)
+    for each track in m.trackData.subtitles
+        track.Selected = track.StreamIndex = selectedIndex
+    end for
+end sub
+
+sub updateVideoTrackSelection(selectedStreamId as string)
+    if not isValid(m.trackData.videos) then return
+
+    for each track in m.trackData.videos
+        track.Selected = track.StreamID = selectedStreamId
+    end for
+end sub
+
+sub restoreFocusToButtons()
+    ' The picker hands straight over to the downloader, so the screen only takes
+    ' focus back once nothing is left open over it
+    if isValid(openTrackPicker()) then return
+
+    if m.buttonGroups.count() > 0 and m.currentButtonIndex >= 0 and m.currentButtonIndex < m.buttonGroups.count()
+        m.buttonGroups[m.currentButtonIndex].setFocus(true)
+        m.top.lastFocus = m.buttonGroups[m.currentButtonIndex]
+        setLastFocus(m.buttonGroups[m.currentButtonIndex])
+    end if
+end sub
+
+' Whichever track picker is still open, if any of them are
+function openTrackPicker() as dynamic
+    if isValid(m.subtitleSelector) and m.subtitleSelector.visible then return m.subtitleSelector
+    if isValid(m.audioSelector) and m.audioSelector.visible then return m.audioSelector
+    if isValid(m.subtitleDownloadDialog) and m.subtitleDownloadDialog.visible then return m.subtitleDownloadDialog
+
+    return invalid
+end function

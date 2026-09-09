@@ -1,0 +1,136 @@
+import "pkg:/source/api/Image.bs"
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/multiserver.bs"
+
+import "pkg:/source/enums/ImageType.bs"
+
+' The title, year, runtime and tagline block, shared by the classic and modern detail
+' screens so both behave the same. These run in the host screen's scope, so m is
+' whichever screen imported them. Each screen keeps its own init() and node
+' observers, this file has none.
+'
+' Hooks each screen provides:
+'   sub buildStreamSummary(itemData as object)
+'   function backdropSourceFor(itemData as object) as object
+'   function backdropRequestParams(params as object) as object
+
+sub hideEpisodeHeader()
+    episodeHeaderNode = m.top.findNode("episodeHeader")
+    if isValid(episodeHeaderNode)
+        episodeHeaderNode.visible = false
+    end if
+end sub
+
+sub populateMovieMetadata(itemData as object)
+    hideEpisodeHeader()
+
+    if isValid(itemData.PremiereDate)
+        releaseDate = CreateObject("roDateTime")
+        releaseDate.FromISO8601String(itemData.PremiereDate)
+        setFieldText("releaseYear", stri(releaseDate.GetYear()).trim())
+    else if isValid(itemData.productionYear)
+        setFieldText("releaseYear", itemData.productionYear)
+    end if
+
+    if isValid(itemData.officialRating)
+        setFieldText("officialRating", itemData.officialRating)
+    end if
+
+    if isValidAndNotEmpty(itemData.Taglines)
+        setFieldText("tagline", itemData.Taglines[0])
+    end if
+
+    buildStreamSummary(itemData)
+end sub
+
+sub populateSeriesMetadata(itemData as object)
+    hideEpisodeHeader()
+
+    if isValid(itemData.productionYear)
+        setFieldText("releaseYear", itemData.productionYear)
+    end if
+
+    if isValid(itemData.officialRating)
+        setFieldText("officialRating", itemData.officialRating)
+    end if
+
+    if isChainValid(itemData, "ChildCount") and itemData.ChildCount > 0
+        seasonText = stri(itemData.ChildCount).trim()
+        if itemData.ChildCount = 1
+            seasonText += " Season"
+        else
+            seasonText += " Seasons"
+        end if
+        setFieldText("seasonCount", seasonText)
+    end if
+
+    if isValidAndNotEmpty(itemData.Taglines)
+        setFieldText("tagline", itemData.Taglines[0])
+    end if
+end sub
+
+sub populateRuntime(itemData as object)
+    ' Series don't have runtime or an ends at value, so the season count shows instead
+    if isSeries()
+        setFieldText("runtime", "")
+        setFieldText("endsAt", "")
+        return
+    end if
+
+    if type(itemData.RunTimeTicks) = "LongInteger"
+        setFieldText("runtime", getFormattedRuntime(itemData.RunTimeTicks))
+        endsAtText = tr("Ends at %1").Replace("%1", getEndTimeFromTicks(itemData.RunTimeTicks))
+        setFieldText("endsAt", endsAtText)
+    else
+        setFieldText("runtime", "")
+        setFieldText("endsAt", "")
+    end if
+end sub
+
+function getMonthName(month as integer) as string
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    if month >= 1 and month <= 12
+        return months[month - 1]
+    end if
+    return ""
+end function
+
+sub setBackdropImage(itemData as object)
+    backdropPoster = m.top.findNode("backdrop")
+    if not isValid(backdropPoster) then return
+
+    ' A Seerr title has no library images, so it carries finished TMDB urls instead
+    if isValidAndNotEmpty(itemData._externalBackdropUrl)
+        backdropPoster.uri = itemData._externalBackdropUrl
+        return
+    end if
+
+    serverBaseUrl = invalid
+    if isChainValid(itemData, "_serverUrl")
+        serverBaseUrl = itemData._serverUrl
+        if serverBaseUrl.right(1) = "/"
+            serverBaseUrl = serverBaseUrl.left(serverBaseUrl.len() - 1)
+        end if
+    end if
+
+    backdropSource = backdropSourceFor(itemData)
+    if not isValid(backdropSource.imageTag) then return
+
+    params = backdropRequestParams({
+        "maxWidth": 1920,
+        "maxHeight": 1080,
+        "quality": 90,
+        "Tag": backdropSource.imageTag
+    })
+
+    backdropUrl = invalid
+    if isValid(serverBaseUrl)
+        backdropUrl = buildImageURLForServer(serverBaseUrl, backdropSource.backdropItemId, backdropSource.imageVersion, params)
+    else
+        backdropUrl = ImageURL(backdropSource.backdropItemId, backdropSource.imageVersion, params)
+    end if
+
+    if isValid(backdropUrl)
+        backdropPoster.uri = backdropUrl
+    end if
+end sub

@@ -12,6 +12,10 @@ import "pkg:/source/utils/seerrButtons.bs"
 import "pkg:/source/utils/detailActions.bs"
 import "pkg:/source/utils/seerrDetailHost.bs"
 import "pkg:/source/utils/multiserver.bs"
+import "pkg:/components/details/detailTrackHost.bs"
+import "pkg:/components/details/detailMetadataHost.bs"
+import "pkg:/components/details/detailScreenHost.bs"
+import "pkg:/components/details/detailButtonHost.bs"
 
 import "pkg:/source/enums/AnimationControl.bs"
 import "pkg:/source/enums/AnimationState.bs"
@@ -200,81 +204,6 @@ sub sizeClassicFonts()
 end sub
 
 ' ============================================
-' Screen lifecycle
-' ============================================
-
-sub onDisplayResumeButtonChange()
-    if isValid(m.top.itemContent) and isChainValid(m.top.itemContent, "json")
-        updateButtonVisibility(m.top.itemContent.json)
-    end if
-end sub
-
-sub onShuffleEpisodeDataLoaded()
-    m.getShuffleEpisodesTask.unobserveField("data")
-    m.global.queueManager.callFunc("set", m.getShuffleEpisodesTask.data.items)
-    m.global.queueManager.callFunc("playQueue")
-end sub
-
-sub OnScreenShown(_isReturning = false as boolean)
-    picker = openTrackPicker()
-    if isValid(picker)
-        picker.setFocus(true)
-    else if _isReturning and isValid(m.top.lastFocus)
-        m.top.lastFocus.setFocus(true)
-        setLastFocus(m.top.lastFocus)
-
-        if isValid(m.extrasGrid) and m.top.lastFocus.isSameNode(m.extrasGrid)
-            scrollContentTo(-500)
-        else
-            scrollContentTo(0)
-        end if
-    else
-        focusFirstVisibleButton()
-    end if
-
-    if m.loadStatus = ViewLoadStatus.RELOAD
-        if not isSeries()
-            if isChainValid(m.top.itemContent, "json.mediaStreams")
-                SetDefaultAudioTrack(m.top.itemContent.json)
-                SetUpAudioOptions(m.top.itemContent.json.mediaStreams)
-            end if
-            if isChainValid(m.top.itemContent, "json.mediaSources")
-                SetUpVideoOptions(m.top.itemContent.json.mediaSources)
-            end if
-        end if
-    end if
-
-    if m.loadStatus = ViewLoadStatus.INIT
-        m.loadStatus = ViewLoadStatus.FIRSTLOAD
-        return
-    end if
-
-    m.loadStatus = ViewLoadStatus.RELOAD
-
-    ' Trigger refresh via the appropriate field based on item type
-    if isEpisode()
-        m.top.refreshEpisodeDetailsData = not m.top.refreshEpisodeDetailsData
-    else if isSeries()
-        m.top.refreshSeriesDetailsData = not m.top.refreshSeriesDetailsData
-    else
-        m.top.refreshMovieDetailsData = not m.top.refreshMovieDetailsData
-    end if
-end sub
-
-sub onSelectedPartChanged()
-    if not isValid(m.top.selectedPart) then return
-    m.global.queueManager.callFunc("setLastKnownItemID", m.top.selectedPart.id)
-    m.loadStatus = ViewLoadStatus.FIRSTLOAD
-    m.global.queueManager.callFunc("setLastKnownItemExtraType", string.EMPTY)
-
-    if isEpisode()
-        m.top.refreshEpisodeDetailsData = not m.top.refreshEpisodeDetailsData
-    else
-        m.top.refreshMovieDetailsData = not m.top.refreshMovieDetailsData
-    end if
-end sub
-
-' ============================================
 ' Content changed handler
 ' ============================================
 
@@ -399,70 +328,29 @@ sub itemContentChanged()
 end sub
 
 ' ============================================
-' Item type helper
-' ============================================
-
-function isEpisode() as boolean
-    return LCase(m.top.itemType) = "episode"
-end function
-
-function isSeries() as boolean
-    return LCase(m.top.itemType) = "series"
-end function
-
-' ============================================
 ' Backdrop
 ' ============================================
 
-sub setBackdropImage(itemData as object)
-    backdropPoster = m.top.findNode("backdrop")
-    if not isValid(backdropPoster) then return
-
-    ' A Seerr title has no library images, so it carries finished TMDB urls instead
-    if isValidAndNotEmpty(itemData._externalBackdropUrl)
-        backdropPoster.uri = itemData._externalBackdropUrl
-        return
-    end if
-
-    serverBaseUrl = invalid
-    if isChainValid(itemData, "_serverUrl")
-        serverBaseUrl = itemData._serverUrl
-        if serverBaseUrl.right(1) = "/"
-            serverBaseUrl = serverBaseUrl.left(serverBaseUrl.len() - 1)
-        end if
-    end if
-
-    imageVersion = ImageType.BACKDROP
-    imageTag = invalid
-    backdropItemId = itemData.id
-
+' Which image stands in for the backdrop. The classic screen falls back from the
+' backdrop straight to the item's own primary image
+function backdropSourceFor(itemData as object) as object
     if isValidAndNotEmpty(itemData.BackdropImageTags)
-        imageTag = itemData.BackdropImageTags[0]
+        return { imageVersion: ImageType.BACKDROP, imageTag: itemData.BackdropImageTags[0], backdropItemId: itemData.id }
     else if isChainValid(itemData, "ImageTags.Primary")
-        imageVersion = ImageType.PRIMARY
-        imageTag = itemData.ImageTags.Primary
+        return { imageVersion: ImageType.PRIMARY, imageTag: itemData.ImageTags.Primary, backdropItemId: itemData.id }
     end if
 
-    if not isValid(imageTag) then return
+    return { imageVersion: ImageType.BACKDROP, imageTag: invalid, backdropItemId: itemData.id }
+end function
 
-    params = {
-        "maxWidth": 1920,
-        "maxHeight": 1080,
-        "quality": 90,
-        "blur": getBackdropBlurAmount(),
-        "Tag": imageTag
-    }
+function backdropRequestParams(params as object) as object
+    params.blur = getBackdropBlurAmount()
+    return params
+end function
 
-    backdropUrl = invalid
-    if isValid(serverBaseUrl)
-        backdropUrl = buildImageURLForServer(serverBaseUrl, backdropItemId, imageVersion, params)
-    else
-        backdropUrl = ImageURL(backdropItemId, imageVersion, params)
-    end if
-
-    if isValid(backdropUrl)
-        backdropPoster.uri = backdropUrl
-    end if
+' The modern screen scales its scrims to the blur setting. The classic screen
+' draws a flat tint in XML, so there is nothing to do per show here
+sub applyBackdropTreatment()
 end sub
 
 ' ============================================
@@ -558,60 +446,6 @@ sub populateEpisodeMetadata(itemData as object, item as object)
     end if
 
     populateStreamInfo(itemData)
-end sub
-
-sub populateMovieMetadata(itemData as object)
-    episodeHeaderNode = m.top.findNode("episodeHeader")
-    if isValid(episodeHeaderNode)
-        episodeHeaderNode.visible = false
-    end if
-
-    if isValid(itemData.PremiereDate)
-        releaseDate = CreateObject("roDateTime")
-        releaseDate.FromISO8601String(itemData.PremiereDate)
-        setFieldText("releaseYear", stri(releaseDate.GetYear()).trim())
-    else if isValid(itemData.productionYear)
-        setFieldText("releaseYear", itemData.productionYear)
-    end if
-
-    if isValid(itemData.officialRating)
-        setFieldText("officialRating", itemData.officialRating)
-    end if
-
-    if isValid(itemData.Taglines) and isValidAndNotEmpty(itemData.Taglines)
-        setFieldText("tagline", itemData.Taglines[0])
-    end if
-
-    populateStreamInfo(itemData)
-end sub
-
-sub populateSeriesMetadata(itemData as object)
-    episodeHeaderNode = m.top.findNode("episodeHeader")
-    if isValid(episodeHeaderNode)
-        episodeHeaderNode.visible = false
-    end if
-
-    if isValid(itemData.productionYear)
-        setFieldText("releaseYear", itemData.productionYear)
-    end if
-
-    if isValid(itemData.officialRating)
-        setFieldText("officialRating", itemData.officialRating)
-    end if
-
-    if isChainValid(itemData, "ChildCount") and itemData.ChildCount > 0
-        seasonText = stri(itemData.ChildCount).trim()
-        if itemData.ChildCount = 1
-            seasonText += " Season"
-        else
-            seasonText += " Seasons"
-        end if
-        setFieldText("seasonCount", seasonText)
-    end if
-
-    if isValid(itemData.Taglines) and isValidAndNotEmpty(itemData.Taglines)
-        setFieldText("tagline", itemData.Taglines[0])
-    end if
 end sub
 
 sub populateRatings(itemData as object)
@@ -927,36 +761,6 @@ function getDividerBetween(colA as object, colB as object, allColumns as object,
     return invalid
 end function
 
-sub populateRuntime(itemData as object)
-    ' Series don't have runtime or "ends at" - season count is shown instead
-    if isSeries()
-        setFieldText("runtime", "")
-        setFieldText("endsAt", "")
-        return
-    end if
-
-    if type(itemData.RunTimeTicks) = "LongInteger"
-        setFieldText("runtime", getFormattedRuntime(itemData.RunTimeTicks))
-        endsAtText = tr("Ends at %1").Replace("%1", getEndTimeFromTicks(itemData.RunTimeTicks))
-        setFieldText("endsAt", endsAtText)
-    else
-        setFieldText("runtime", "")
-        setFieldText("endsAt", "")
-    end if
-end sub
-
-' ============================================
-' Video / Audio / Quality helpers
-' ============================================
-
-function getMonthName(month as integer) as string
-    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-    if month >= 1 and month <= 12
-        return months[month - 1]
-    end if
-    return ""
-end function
-
 ' ============================================
 ' Layout: metadata row (horizontal positioning)
 ' ============================================
@@ -1121,14 +925,6 @@ end function
 ' Layout: vertical container positioning
 ' ============================================
 
-' Laying out sets the overview's width, which can settle it at a new height and
-' ask for the layout again, so the second pass is left to the first one
-sub onOverviewHeightChanged()
-    if m.layingOut = true then return
-
-    layoutContainer()
-end sub
-
 sub layoutContainer()
     m.layingOut = true
     ' Children of the container Group are placed by hand, in the margins the
@@ -1243,15 +1039,10 @@ end sub
 
 ' Brings the focused section up near the top of the screen, the way entering the
 ' extras rows brings those up
-sub scrollToSeerrBlock()
+sub scrollToSeerrFocus()
     if not isValid(m.seerrBlock) then return
     top = CLASSIC_CONTAINER_TOP + m.seerrBlock.translation[1] + m.seerrBlock.focusedOffset
     scrollContentTo(-(top - 200))
-end sub
-
-sub onSeerrFocusMoved()
-    if not m.seerrBlock.isInFocusChain() then return
-    scrollToSeerrBlock()
 end sub
 
 ' The poster ends level with the text beside it, but stays put rather than riding
@@ -1386,174 +1177,15 @@ sub updatePlayedIndicator()
 end sub
 
 ' ============================================
-' Video/Audio options setup
-' ============================================
-
-sub SetUpVideoOptions(streams)
-    videos = []
-
-    for i = 0 to streams.Count() - 1
-        if LCase(streams[i].VideoType) = VideoType.VIDEOFILE
-            videoCodecForDisplay = ""
-            codec = ""
-            if isValidAndNotEmpty(streams[i].mediaStreams)
-                for index = 0 to streams[i].mediaStreams.Count() - 1
-                    if LCase(streams[i].mediaStreams[index].Type) = MediaStreamType.VIDEO
-                        if m.performRotationCheck
-                            rotation = chainLookupReturn(streams[i].mediaStreams[index], "rotation", 0)
-                            if rotation <> 0
-                                m.global.queueManager.callFunc("setForceTranscode", PlaybackMethod.FORCETRANSCODEALLOWREMUX)
-                            end if
-                        end if
-                        exit for
-                    end if
-                end for
-                videoCodecForDisplay = streams[i].mediaStreams[0].displayTitle
-                codec = streams[i].mediaStreams[0].Codec
-            end if
-
-            videos.push({
-                "Title": streams[i].Name,
-                "Description": tr("Video"),
-                "Selected": m.top.selectedVideoStreamId = streams[i].id,
-                "StreamID": streams[i].id,
-                "video_codec": videoCodecForDisplay,
-                "codec": codec
-            })
-        end if
-    end for
-
-    m.trackData.videos = videos
-end sub
-
-sub SetUpAudioOptions(streams)
-    preferredSubtitle = m.global.queueManager.callFunc("getPreferredSubtitleTrack")
-    selectedSubtitle = isChainValid(preferredSubtitle, "StreamIndex") ? preferredSubtitle.StreamIndex : SubtitleSelection.NONE
-
-    audioTracks = []
-    subtitleTracks = [{
-        "StreamIndex": SubtitleSelection.NONE,
-        "json": {},
-        "Title": "None",
-        "Description": "None",
-        "Selected": selectedSubtitle = SubtitleSelection.NONE
-    }]
-
-    audioStreamCount = 1
-    for i = 0 to streams.Count() - 1
-        if streams[i].Type = "Audio"
-            rokuTrackName = `#uniq:${streams[i].LookupCI("Title") ?? string.EMPTY}(${audioStreamCount})`
-            audioTracks.push({ "Title": streams[i].displayTitle, "Description": streams[i].Title, "Selected": m.top.selectedAudioStreamIndex = i, "StreamIndex": i, "RokuTrackName": rokuTrackName, "Language": streams[i].Language, "Codec": streams[i].Codec, "Channels": streams[i].Channels })
-            audioStreamCount++
-        end if
-        if streams[i].Type = "Subtitle"
-            subtitleTracks.push({ "Title": streams[i].displayTitle, "json": streams[i], "Description": streams[i].Title, "Selected": selectedSubtitle = streams[i].index, "StreamIndex": i })
-        end if
-    end for
-
-    m.trackData.audios = audioTracks
-    m.trackData.subtitles = subtitleTracks
-end sub
-
-sub SetDefaultAudioTrack(itemData)
-    preferredAudioTrackIndex = m.global.queueManager.callFunc("getPreferredAudioTrackIndex")
-    preferredAudioTrackName = m.global.queueManager.callFunc("getPreferredAudioTrackName")
-    preferredLanguage = getPreferredLanguage("playback.audioPreferredLanguage")
-    firstAudioTrack = -1
-
-    defaultAudioTrackIndex = getDefaultAudioTrackIndex(itemData.mediaStreams)
-    defaultAudioTrackName = string.EMPTY
-
-    if preferredAudioTrackIndex < 0 and chainLookupReturn(m.global.session, "user.settings.`playback.playDefaultAudioTrack`", false)
-        preferredAudioTrackIndex = defaultAudioTrackIndex
-    end if
-
-    audioStreamCount = 1
-    for i = 0 to itemData.mediaStreams.Count() - 1
-        if itemData.mediaStreams[i].Type = "Audio"
-            rokuTrackName = `#uniq:${itemData.mediaStreams[i].LookupCI("Title") ?? string.EMPTY}(${audioStreamCount})`
-
-            if firstAudioTrack < 0 then firstAudioTrack = i
-            if i = defaultAudioTrackIndex then defaultAudioTrackName = rokuTrackName
-
-            if i = preferredAudioTrackIndex
-                m.global.queueManager.callFunc("setPreferredAudioTrackName", rokuTrackName)
-                preferredAudioTrackName = rokuTrackName
-            end if
-
-            if preferredAudioTrackIndex < 0 and isValid(preferredLanguage)
-                if isStringEqual(chainLookupReturn(itemData.mediaStreams[i], "Language", invalid), preferredLanguage)
-                    m.top.selectedAudioStreamIndex = i
-                    m.global.queueManager.callFunc("setPreferredAudioTrackName", rokuTrackName)
-                    return
-                end if
-            end if
-
-            if isStringEqual(rokuTrackName, preferredAudioTrackName)
-                m.top.selectedAudioStreamIndex = i
-                return
-            end if
-
-            audioStreamCount++
-        end if
-    end for
-
-    if defaultAudioTrackIndex > -1
-        m.top.selectedAudioStreamIndex = defaultAudioTrackIndex
-        m.global.queueManager.callFunc("setPreferredAudioTrackName", defaultAudioTrackName)
-        return
-    end if
-
-    if firstAudioTrack > -1
-        m.top.selectedAudioStreamIndex = firstAudioTrack
-    end if
-end sub
-
-' ============================================
 ' Button management
 ' ============================================
 
-' The Seerr payload lands after the row is first drawn, so it is drawn again with the
-' Seerr entries in, keeping focus where it was rather than snapping to the front
-sub onSeerrButtonsStale()
-    hadFocus = false
-    focusIndex = 0
-    for i = 0 to m.buttonGroups.count() - 1
-        if m.buttonGroups[i].isInFocusChain()
-            hadFocus = true
-            focusIndex = i
-            exit for
-        end if
-    end for
-
+sub clearButtonRow()
     m.buttonConfigs = []
-    addButtons(m.top.itemContent.json)
-    buildButtonRows()
-
-    if hadFocus and m.buttonGroups.count() > 0
-        if focusIndex >= m.buttonGroups.count() then focusIndex = m.buttonGroups.count() - 1
-        m.currentButtonIndex = focusIndex
-        m.buttonGroups[focusIndex].setFocus(true)
-        highlightButton(focusIndex)
-    end if
 end sub
 
-sub updateButtonVisibility(itemData as object)
-    m.buttonConfigs = []
-    m.actionsExpanded = false
-
-    addButtons(itemData)
+sub commitButtonRow()
     buildButtonRows()
-
-    if m.buttonGroups.count() > 0
-        m.currentButtonIndex = 0
-        timer = CreateObject("roSGNode", "Timer")
-        timer.duration = 0.05
-        timer.repeat = false
-        timer.observeField("fire", "focusFirstButton")
-        timer.control = "start"
-        m.focusTimer = timer
-    end if
 end sub
 
 sub centerButtonRow()
@@ -1561,217 +1193,24 @@ sub centerButtonRow()
     centerButtonRowInContainer(m.buttonRowExtra, m.buttonGroups.count() - m.primaryCount, CLASSIC_BUTTON_WIDTH, CLASSIC_BUTTON_GAP, 96)
 end sub
 
-sub focusFirstButton()
-    if m.buttonGroups.count() > 0
-        m.buttonGroups[0].setFocus(true)
-        highlightButton(0)
-    end if
-end sub
-
-sub focusFirstVisibleButton()
-    firstVisibleIndex = 0
-    for i = 0 to m.buttonGroups.count() - 1
-        if m.buttonGroups[i].visible
-            firstVisibleIndex = i
-            exit for
-        end if
-    end for
-
-    if firstVisibleIndex < m.buttonGroups.count()
-        m.currentButtonIndex = firstVisibleIndex
-        m.buttonGroups[firstVisibleIndex].setFocus(true)
-        highlightButton(firstVisibleIndex)
-        setLastFocus(m.buttonGroups[firstVisibleIndex])
-    end if
-end sub
-
-sub addButtons(itemData as object)
-    if isSeries()
-        addSeriesButtons()
-        return
-    end if
-
-    positionTicks = 0&
-    if isValid(itemData.UserData) and itemData.UserData.PlaybackPositionTicks > 0
-        positionTicks = itemData.UserData.PlaybackPositionTicks
-    end if
-    hasProgress = positionTicks > 0
-
-    if hasProgress
-        addButton({
-            icon: "pkg:/images/icons/detail_play.png",
-            label: tr("Resume"),
-            detail: getFormattedRuntime(positionTicks),
-            action: "resume",
-            id: "resumeButton"
-        })
-    end if
-
-    ' With a resume point on offer the second button starts over instead, which
-    ' is how the other clients pair the two
-    addButton({
-        icon: hasProgress ? "pkg:/images/icons/detail_restart.png" : "pkg:/images/icons/detail_play.png",
-        label: hasProgress ? tr("Restart") : tr("Play"),
-        action: hasProgress ? "restart" : "play",
-        id: hasProgress ? "restartButton" : "playButton"
-    })
-
-    ' Pushed in the catalogue's order, since that is what decides where a button
-    ' the user never placed ends up
-    candidates = []
-
-    if isValid(itemData.MediaSources) and itemData.MediaSources.Count() > 1
-        candidates.push({ id: "version", config: {
-            icon: "pkg:/images/icons/detail_version.png",
-            label: tr("Versions"),
-            action: "versionTrack",
-            id: "versionButton"
-        } })
-    end if
-
-    if isValid(itemData.MediaStreams)
-        audioCount = 0
-        for each stream in itemData.MediaStreams
-            if stream.Type = "Audio" then audioCount++
-        end for
-        if audioCount > 1
-            candidates.push({ id: "audio", config: {
-                icon: "pkg:/images/icons/detail_audio.png",
-                label: tr("Audio"),
-                action: "audioTrack",
-                id: "audioTrackButton"
-            } })
-        end if
-    end if
-
-    candidates.push({ id: "subtitles", config: {
-        icon: "pkg:/images/icons/detail_subtitle.png",
-        label: tr("Subtitle"),
-        action: "subtitleTrack",
-        id: "subtitleButton"
-    } })
-
-    if m.top.trailerAvailable
-        candidates.push({ id: "trailer", config: {
-            icon: "pkg:/images/icons/detail_trailer.png",
-            label: tr("Trailer"),
-            action: "trailer",
-            id: "trailerButton"
-        } })
-    end if
-
-    isWatched = chainLookupReturn(itemData, "UserData.Played", false)
-    candidates.push({ id: "watched", config: {
-        icon: "pkg:/images/icons/detail_watched.png",
-        label: isWatched ? tr("Watched") : tr("Unwatched"),
-        activeInk: isWatched ? CLASSIC_WATCHED_INK : "",
-        action: "watched",
-        id: "watchedButton"
-    } })
-
-    isFavorited = chainLookupReturn(itemData, "UserData.IsFavorite", false)
-    candidates.push({ id: "favorite", config: {
-        icon: "pkg:/images/icons/detail_favorite.png",
-        label: isFavorited ? tr("Favorited") : tr("Favorite"),
-        activeInk: isFavorited ? CLASSIC_FAVORITE_INK : "",
-        action: "favorite",
-        id: "favoriteButton"
-    } })
-
-    if isEpisode()
-        candidates.push({ id: "goToSeries", config: {
-            icon: "pkg:/images/icons/detail_series.png",
-            label: tr("Go to Series"),
-            action: "goToSeries",
-            id: "goToSeriesButton"
-        } })
-    end if
-
-    addArrangedButtons(candidates)
-end sub
-
-sub addArrangedButtons(candidates as object)
-    order = m.global.session.user.settings[DETAIL_ORDER_SETTING]
-    hidden = m.global.session.user.settings[DETAIL_HIDDEN_SETTING]
-
-    for each candidate in seerrButtons.Candidates(m.seerrDetails, seerrMediaType())
-        candidates.push(candidate)
-    end for
-
-    for each candidate in detailActionCandidates(m.top.itemContent.json)
-        candidates.push(candidate)
-    end for
-
-    for each candidate in buttonLayout.Arrange(buttonLayout.InCatalogueOrder(candidates), order, hidden)
-        addButton(candidate.config)
-    end for
-end sub
-
-' Asking Seerr for the title is its own flow, with dialogs of its own, so it is handed off
-' Seerr has taken the request, so the buttons are rebuilt off a fresh payload
-sub addSeriesButtons()
-    hasResume = m.top.displayResumeButton
-    if hasResume
-        addButton({
-            icon: "pkg:/images/icons/detail_play.png",
-            label: tr("Resume"),
-            action: "seriesResume",
-            id: "resumeButton"
-        })
-    end if
-
-    addButton({
-        icon: hasResume ? "pkg:/images/icons/detail_restart.png" : "pkg:/images/icons/detail_play.png",
-        label: hasResume ? tr("Restart") : tr("Play"),
-        action: "seriesPlay",
-        id: "playButton"
-    })
-
-    isWatched = chainLookupReturn(m.top.itemContent, "json.UserData.Played", false)
-    isFavorited = chainLookupReturn(m.top.itemContent, "json.UserData.IsFavorite", false)
-
-    candidates = []
-    candidates.push({ id: "shuffle", config: {
-        icon: "pkg:/images/icons/detail_shuffle.png",
-        label: tr("Shuffle"),
-        action: "seriesShuffle",
-        id: "shuffleButton"
-    } })
-
-    if m.top.trailerAvailable
-        candidates.push({ id: "trailer", config: {
-            icon: "pkg:/images/icons/detail_trailer.png",
-            label: tr("Trailer"),
-            action: "trailer",
-            id: "trailerButton"
-        } })
-    end if
-
-    candidates.push({ id: "watched", config: {
-        icon: "pkg:/images/icons/detail_watched.png",
-        label: isWatched ? tr("Watched") : tr("Unwatched"),
-        activeInk: isWatched ? CLASSIC_WATCHED_INK : "",
-        action: "watched",
-        id: "watchedButton"
-    } })
-
-    candidates.push({ id: "favorite", config: {
-        icon: "pkg:/images/icons/detail_favorite.png",
-        label: isFavorited ? tr("Favorited") : tr("Favorite"),
-        activeInk: isFavorited ? CLASSIC_FAVORITE_INK : "",
-        action: "favorite",
-        id: "favoriteButton"
-    } })
-
-    addArrangedButtons(candidates)
-end sub
-
-sub addButton(config as object)
-    ' A Seerr title has nothing in the library behind it, so only the actions that reach
-    ' Seerr itself are worth offering
-    if m.top.seerrOnly and Left(config.id, 5) <> "seerr" then return
+' How one button config becomes a row entry. The classic screen queues configs and
+' builds the rows in one pass, the modern one creates each node as it goes
+sub appendButtonNode(config as object)
     m.buttonConfigs.push(config)
 end sub
+
+' Item types that own their whole action row. The classic screen sends seasons,
+' albums and playlists to the legacy screens instead, so it has none
+function typeSpecificButtons() as boolean
+    return false
+end function
+
+' How a button carries its on/off state. The classic screen tints the icon, the
+' modern one flips a field the button node watches
+function markActiveButton(config as object, isActive as boolean, ink as string) as object
+    config.activeInk = isActive ? ink : ""
+    return config
+end function
 
 function primaryRowCapacity() as integer
     stride = CLASSIC_BUTTON_WIDTH + CLASSIC_BUTTON_GAP
@@ -1829,15 +1268,6 @@ sub buildButtonRows()
     layoutContainer()
 end sub
 
-function moreButtonConfig() as object
-    return {
-        icon: m.actionsExpanded ? "pkg:/images/icons/chevron-up.png" : "pkg:/images/icons/chevron-down.png",
-        label: m.actionsExpanded ? tr("Less") : tr("More"),
-        action: "toggleMoreActions",
-        id: "moreActionsButton"
-    }
-end function
-
 sub appendButton(config as object, row as object)
     buttonGroup = detailButtons.createButton(config, m.buttonGroups.count())
     buttonGroup.observeField("focusedChild", "onButtonFocusChanged")
@@ -1858,31 +1288,11 @@ function rowEnd(index as integer) as integer
     return isExtraRowIndex(index) ? m.buttonGroups.count() - 1 : m.primaryCount - 1
 end function
 
-sub focusButton(index as integer)
-    if index < 0 or index >= m.buttonGroups.count() then return
-
-    m.buttonGroups[index].setFocus(true)
-    m.top.lastFocus = m.buttonGroups[index]
-    m.currentButtonIndex = index
-    highlightButton(index)
-    setLastFocus(m.buttonGroups[index])
-end sub
-
 sub toggleMoreActions()
     m.actionsExpanded = not m.actionsExpanded
     index = m.currentButtonIndex
     buildButtonRows()
     focusButton(index)
-end sub
-
-sub onButtonFocusChanged(event as object)
-    button = event.getRoSGNode()
-    if button <> invalid and button.buttonIndex <> invalid
-        if button.hasFocus() or button.isInFocusChain()
-            m.currentButtonIndex = button.buttonIndex
-            highlightButton(m.currentButtonIndex)
-        end if
-    end if
 end sub
 
 sub highlightButton(index as integer)
@@ -1897,413 +1307,41 @@ end sub
 ' Button actions
 ' ============================================
 
-sub handleButtonSelect()
-    if m.currentButtonIndex < 0 or m.currentButtonIndex >= m.buttonGroups.count() then return
+' Actions only one screen offers. The classic screen sends seasons, albums and
+' playlists to the legacy screens, so it has none of its own
+sub handleScreenButtonAction(_action as string)
+end sub
 
-    buttonGroup = m.buttonGroups[m.currentButtonIndex]
-    if buttonGroup = invalid then return
-
-    buttonAction = buttonGroup.buttonAction
-    if buttonAction = invalid then return
-
-    if buttonAction = "toggleMoreActions"
-        toggleMoreActions()
-        return
-    end if
-
-    if Left(buttonAction, 5) = "seerr"
-        startSeerrRequest(buttonAction)
-        return
-    end if
-
-    m.loadStatus = ViewLoadStatus.RELOAD
-
-    if buttonAction = "resume"
-        startLoadingSpinner()
-        itemContent = m.top.itemContent
-        if itemContent <> invalid and isValid(itemContent.json)
-            playbackPositionTicks = chainLookup(itemContent, "json.UserData.PlaybackPositionTicks") ?? 0
-            itemContent.startingPoint = playbackPositionTicks
-            itemContent.id = m.top.selectedVideoStreamId
-            itemContent.selectedAudioStreamIndex = m.top.selectedAudioStreamIndex
-            m.global.queueManager.callFunc("clear")
-            m.global.queueManager.callFunc("push", itemContent)
-            m.global.queueManager.callFunc("playQueue")
-        end if
-    else if buttonAction = "play"
-        m.top.buttonSelected = "play-button"
-    else if buttonAction = "restart"
-        m.top.buttonSelected = "playFromBeginning-button"
-    else if buttonAction = "trailer"
-        m.top.buttonSelected = "trailer-button"
-    else if buttonAction = "audioTrack"
-        if isValid(m.trackData.audios)
-            m.audioSelector.audioTracks = m.trackData.audios
-            m.audioSelector.visible = true
-            m.audioSelector.setFocus(true)
-            setLastFocus(m.audioSelector)
-        end if
-    else if buttonAction = "subtitleTrack"
-        subtitleTracks = invalid
-        if isValid(m.trackData)
-            subtitleTracks = m.trackData.subtitles
-        end if
-
-        if not isValid(subtitleTracks)
-            preferredSubtitle = m.global.queueManager.callFunc("getPreferredSubtitleTrack")
-            selectedSubtitle = isChainValid(preferredSubtitle, "StreamIndex") ? preferredSubtitle.StreamIndex : SubtitleSelection.NONE
-            subtitleTracks = [{
-                "StreamIndex": SubtitleSelection.NONE,
-                "json": {},
-                "Title": "None",
-                "Description": "None",
-                "Selected": selectedSubtitle = SubtitleSelection.NONE
-            }]
-        end if
-
-        m.subtitleSelector.subtitleTracks = subtitleTracks
-        m.subtitleSelector.visible = true
-        m.subtitleSelector.setFocus(true)
-        setLastFocus(m.subtitleSelector)
-    else if buttonAction = "watched"
-        toggleWatched()
-    else if buttonAction = "personalRating"
-        showRatingPrompt()
-    else if buttonAction = "addToPlaylist"
-        showPlaylistPicker()
-    else if buttonAction = "addToCollection"
-        showCollectionPicker()
-    else if buttonAction = "deleteItem"
-        confirmDelete()
-    else if buttonAction = "changeArtwork"
-        showArtworkPicker()
-    else if buttonAction = "adminControls"
-        showIdentify()
-    else if buttonAction = "goToSeries"
-        m.top.buttonSelected = "goToSeries-button"
-    else if buttonAction = "favorite"
-        toggleFavorite()
-    else if buttonAction = "versionTrack"
-        if isValid(m.trackData.videos)
-            m.versionSelector.videoTracks = m.trackData.videos
-            m.versionSelector.visible = true
-            m.versionSelector.setFocus(true)
-            setLastFocus(m.versionSelector)
-        end if
-    else if buttonAction = "seriesResume"
-        itemContent = m.top.itemContent
-        if isValid(itemContent)
-            itemContent.quickplayFromResume = true
-            m.top.quickPlayNode = itemContent
-        end if
-    else if buttonAction = "seriesPlay"
-        m.top.playSeriesFromStart = not m.top.playSeriesFromStart
-    else if buttonAction = "seriesShuffle"
-        if isValid(m.top.itemContent) and isValid(m.top.itemContent.id)
-            m.getShuffleEpisodesTask.showID = m.top.itemContent.id
-            m.getShuffleEpisodesTask.observeField("data", "onShuffleEpisodeDataLoaded")
-            m.getShuffleEpisodesTask.control = "RUN"
-        end if
+' How a toggle button shows its new state. The classic screen writes the label node
+' that detailButtons.createButton names "<id>Text"
+sub setToggleButtonLabel(buttonId as string, label as string, _isActive as boolean)
+    node = m.top.findNode(buttonId + "Text")
+    if isValid(node)
+        node.text = label
     end if
 end sub
 
-sub toggleWatched()
-    itemContent = m.top.itemContent
-    if itemContent = invalid or not isValid(itemContent.json) then return
-
-    itemData = itemContent.json
-    currentWatched = false
-    if hasValidProperties(itemData, "UserData", "Played")
-        currentWatched = itemData.UserData.Played
-    end if
-
-    newWatchedState = not currentWatched
-
-    itemServerInfo = getServerInfoFromItem(itemContent)
-    taskParams = {}
-
-    if newWatchedState
-        date = CreateObject("roDateTime")
-        dateStr = date.ToISOString()
-        taskParams["DatePlayed"] = dateStr
-        taskParams["PlaybackPositionTicks"] = 0
-        if isValid(itemServerInfo) and isValidAndNotEmpty(itemServerInfo.serverUrl)
-            taskParams["serverData"] = {
-                serverUrl: itemServerInfo.serverUrl,
-                userId: itemServerInfo.userId,
-                authToken: itemServerInfo.authToken
-            }
-        end if
-        m.playstateTask.status = "markPlayed"
-        m.playstateTask.itemId = itemData.id
-        m.playstateTask.params = taskParams
-        m.playstateTask.control = TaskControl.RUN
-        itemData.UserData.PlaybackPositionTicks = 0
-    else
-        if isValid(itemServerInfo) and isValidAndNotEmpty(itemServerInfo.serverUrl)
-            taskParams["serverData"] = {
-                serverUrl: itemServerInfo.serverUrl,
-                userId: itemServerInfo.userId,
-                authToken: itemServerInfo.authToken
-            }
-        end if
-        m.playstateTask.status = "unmarkPlayed"
-        m.playstateTask.itemId = itemData.id
-        m.playstateTask.params = taskParams
-        m.playstateTask.control = TaskControl.RUN
-    end if
-
-    itemData.UserData.Played = newWatchedState
-    itemContent.watched = newWatchedState
-    ' json is a node field, so the read handed back a copy and nothing else sees the change
-    ' until it goes back
-    itemContent.json = itemData
-
-    updatePlayedIndicator()
-
-    watchedText = m.top.findNode("watchedButtonText")
-    if isValid(watchedText)
-        watchedText.text = tr("Unwatched")
-        if newWatchedState
-            watchedText.text = tr("Watched")
-        end if
-    end if
-
-    if m.buttonGroups.count() > 0 and m.currentButtonIndex >= 0 and m.currentButtonIndex < m.buttonGroups.count()
-        highlightButton(m.currentButtonIndex)
-    end if
+' The classic screen lists the streams as a codec row, the modern one as tech chips
+sub buildStreamSummary(itemData as object)
+    populateStreamInfo(itemData)
 end sub
 
-sub toggleFavorite()
-    itemContent = m.top.itemContent
-    if itemContent = invalid or not isValid(itemContent.json) then return
-
-    itemData = itemContent.json
-    currentFavorite = false
-    if hasValidProperties(itemData, "UserData", "IsFavorite")
-        currentFavorite = itemData.UserData.IsFavorite
-    end if
-
-    newFavoriteState = not currentFavorite
-
-    itemServerInfo = getServerInfoFromItem(itemContent)
-    if isValid(itemServerInfo) and isValidAndNotEmpty(itemServerInfo.serverUrl)
-        m.favoriteTask.serverData = {
-            serverUrl: itemServerInfo.serverUrl,
-            userId: itemServerInfo.userId,
-            authToken: itemServerInfo.authToken
-        }
-    else
-        m.favoriteTask.serverData = invalid
-    end if
-
-    if newFavoriteState
-        m.favoriteTask.favTask = "favorite"
-    else
-        m.favoriteTask.favTask = "unfavorite"
-    end if
-    m.favoriteTask.itemId = itemData.id
-    m.favoriteTask.control = TaskControl.RUN
-
-    if not isValid(itemData.UserData)
-        itemData.UserData = {}
-    end if
-    itemData.UserData.IsFavorite = newFavoriteState
-    itemContent.favorite = newFavoriteState
-    itemContent.json = itemData
-
-    updatePlayedIndicator()
-
-    favoriteText = m.top.findNode("favoriteButtonText")
-    if isValid(favoriteText)
-        favoriteText.text = tr("Favorite")
-        if newFavoriteState
-            favoriteText.text = tr("Favorited")
-        end if
-    end if
-
-    if m.buttonGroups.count() > 0 and m.currentButtonIndex >= 0 and m.currentButtonIndex < m.buttonGroups.count()
-        highlightButton(m.currentButtonIndex)
-    end if
+' The classic stream row changes height with the codec list, so the stack below it
+' is laid out again
+sub refreshAfterVersionChange()
+    layoutMetadataRow()
+    layoutContainer()
 end sub
 
-' ============================================
-' Audio/Subtitle/Video option handlers
-' ============================================
-
-sub onAudioStreamIndexChanged()
-    if m.audioSelector.audioStreamIndex <> m.top.selectedAudioStreamIndex
-        m.top.selectedAudioStreamIndex = m.audioSelector.audioStreamIndex
-        m.global.queueManager.callFunc("setPreferredAudioTrackIndex", m.audioSelector.audioStreamIndex)
-        m.global.queueManager.callFunc("setPreferredAudioTrackName", m.audioSelector.audioStreamName)
-
-        if isValid(m.top.itemContent)
-            m.top.itemContent.selectedAudioStreamIndex = m.top.selectedAudioStreamIndex
-        end if
-
-        if isValid(m.trackData.audios)
-            for each track in m.trackData.audios
-                track.Selected = (track.StreamIndex = m.top.selectedAudioStreamIndex)
-            end for
-        end if
-    end if
-end sub
-
-sub onSubtitleStreamChanged()
-    if isValid(m.subtitleSelector.subtitleStream)
-        m.global.queueManager.callFunc("setPreferredSubtitleTrack", m.subtitleSelector.subtitleStream)
-        updateSubtitleTrackSelection(m.subtitleSelector.subtitleStream)
-    end if
-end sub
-
-sub onSubtitleDownloadRequested()
-    if not m.subtitleSelector.downloadRequested then return
-
-    m.subtitleSelector.downloadRequested = false
-    itemId = chainLookup(m.top, "itemContent.id")
-    if not isValidAndNotEmpty(itemId) then return
-
-    preferredSubtitle = m.global.queueManager.callFunc("getPreferredSubtitleTrack")
-    subtitleIndex = isChainValid(preferredSubtitle, "StreamIndex") ? preferredSubtitle.StreamIndex : SubtitleSelection.NONE
-
-    m.subtitleDownloadDialog.itemId = itemId
-    m.subtitleDownloadDialog.language = remoteSubtitles.LanguageFor(chainLookupReturn(m.top, "itemContent.json.mediaStreams", []), subtitleIndex, m.top.selectedAudioStreamIndex)
-    m.subtitleDownloadDialog.visible = true
-    m.subtitleDownloadDialog.setFocus(true)
-    m.subtitleDownloadDialog.callFunc("startSearch")
-end sub
-
-sub onAudioSelectorVisibleChanged()
-    if not m.audioSelector.visible
-        restoreFocusToButtons()
-    end if
-end sub
-
-sub onSubtitleDownloadDialogVisibleChanged()
-    if not m.subtitleDownloadDialog.visible
-        restoreFocusToButtons()
-    end if
-end sub
-
-sub onSubtitleSelectorVisibleChanged()
-    if not m.subtitleSelector.visible
-        restoreFocusToButtons()
-    end if
-end sub
-
-sub onVersionSelectorVisibleChanged()
-    if not m.versionSelector.visible
-        restoreFocusToButtons()
-    end if
-end sub
-
-sub onVersionSelected()
-    newStreamId = m.versionSelector.videoStreamId
-    if newStreamId <> m.top.selectedVideoStreamId
-        m.top.selectedVideoStreamId = newStreamId
-        m.currentCodec = m.versionSelector.codec
-        m.top.unobservefield("itemContent")
-        itemData = m.top.itemContent.json
-        for each mediaSource in itemData.mediaSources
-            if mediaSource.id = newStreamId
-                itemData.mediaStreams = []
-                for i = 0 to mediaSource.mediaStreams.Count() - 1
-                    itemData.mediaStreams.push(mediaSource.mediaStreams[i])
-                end for
-                if isValid(mediaSource.RunTimeTicks)
-                    itemData.RunTimeTicks = mediaSource.RunTimeTicks
-                end if
-                SetDefaultAudioTrack(itemData)
-                SetUpAudioOptions(itemData.mediaStreams)
-                exit for
-            end if
-        end for
-        m.top.itemContent.json = itemData
-        m.top.observeField("itemContent", "itemContentChanged")
-
-        populateRuntime(itemData)
-        populateStreamInfo(itemData)
-        layoutMetadataRow()
-        layoutContainer()
-
-        updateVideoTrackSelection(newStreamId)
-
-        if isStringEqual(PlaybackMethod.FORCETRANSCODEDISABLEREMUX, m.global.session.user.settings["playback.media.forceTranscode"] ?? PlaybackMethod.PLAYNORMALLY)
-            m.global.queueManager.callFunc("setForceTranscode", PlaybackMethod.FORCETRANSCODEDISABLEREMUX, m.currentCodec)
-        end if
-    end if
-end sub
-
-sub updateSubtitleTrackSelection(selectedSubtitle as object)
-    if not isValid(m.trackData.subtitles) then return
-
-    selectedIndex = chainLookupReturn(selectedSubtitle, "StreamIndex", SubtitleSelection.NONE)
-    for each track in m.trackData.subtitles
-        track.Selected = track.StreamIndex = selectedIndex
-    end for
-end sub
-
-sub updateVideoTrackSelection(selectedStreamId as string)
-    if not isValid(m.trackData.videos) then return
-
-    for each track in m.trackData.videos
-        track.Selected = track.StreamID = selectedStreamId
-    end for
-end sub
-
-sub restoreFocusToButtons()
-    ' The picker hands straight over to the downloader, so the screen only takes
-    ' focus back once nothing is left open over it
-    if isValid(openTrackPicker()) then return
-
-    if m.buttonGroups.count() > 0 and m.currentButtonIndex >= 0 and m.currentButtonIndex < m.buttonGroups.count()
-        m.buttonGroups[m.currentButtonIndex].setFocus(true)
-        m.top.lastFocus = m.buttonGroups[m.currentButtonIndex]
-        setLastFocus(m.buttonGroups[m.currentButtonIndex])
-    end if
-end sub
-
-' ============================================
-' Overview scrollability check
-' ============================================
-
-function overviewCanScroll() as boolean
-    return isValid(m.overview) and m.overview.visible and m.overview.canToggle
+' How far the page scrolls to put the content area in view. The classic screen
+' keeps a fixed offset, the modern one works it out from the overview
+function contentScrollOffset() as integer
+    return -500
 end function
-
-' ============================================
-' Smooth page scrolling
-' ============================================
-
-sub scrollContentTo(targetY as integer)
-    if m.scrollAnim = invalid or m.scrollInterp = invalid or m.scrollableContent = invalid then return
-    m.scrollAnim.control = "stop"
-    m.scrollInterp.keyValue = [[0, m.currentScrollY], [0, targetY]]
-    m.currentScrollY = targetY
-    m.scrollAnim.control = "start"
-end sub
-
-sub onExtrasRowChanged()
-    ' Only scroll the page when first entering the extras area.
-    ' The RowList's built-in floatingFocus handles row-level scrolling.
-    if m.extrasGrid = invalid or not m.extrasGrid.isInFocusChain() then return
-    if m.currentScrollY <> -500
-        scrollContentTo(-500)
-    end if
-end sub
 
 ' ============================================
 ' Key event handling
 ' ============================================
-
-' Whichever track picker is still on screen, if either is
-function openTrackPicker() as dynamic
-    if isValid(m.subtitleSelector) and m.subtitleSelector.visible then return m.subtitleSelector
-    if isValid(m.audioSelector) and m.audioSelector.visible then return m.audioSelector
-    if isValid(m.subtitleDownloadDialog) and m.subtitleDownloadDialog.visible then return m.subtitleDownloadDialog
-
-    return invalid
-end function
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
@@ -2357,7 +1395,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
             if m.extrasGrid.itemFocused >= lastRow and m.seerrBlock.callFunc("focusFirst")
                 setLastFocus(m.seerrBlock)
                 m.top.lastFocus = m.seerrBlock
-                scrollToSeerrBlock()
+                scrollToSeerrFocus()
                 return true
             end if
         end if
@@ -2367,7 +1405,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
                 m.extrasGrid.setFocus(true)
                 setLastFocus(m.extrasGrid)
                 m.top.lastFocus = m.extrasGrid
-                scrollContentTo(-500)
+                scrollContentTo(contentScrollOffset())
             else if m.buttonGroups.count() > 0
                 m.buttonGroups[m.currentButtonIndex].setFocus(true)
                 m.top.lastFocus = m.buttonGroups[m.currentButtonIndex]
@@ -2436,12 +1474,12 @@ function onKeyEvent(key as string, press as boolean) as boolean
                 m.top.lastFocus = m.extrasGrid
                 setLastFocus(m.extrasGrid)
                 unhighlightAllButtons()
-                scrollContentTo(-500)
+                scrollContentTo(contentScrollOffset())
             else if isValid(m.seerrBlock) and m.seerrBlock.visible and m.seerrBlock.callFunc("focusFirst")
                 m.top.lastFocus = m.seerrBlock
                 setLastFocus(m.seerrBlock)
                 unhighlightAllButtons()
-                scrollToSeerrBlock()
+                scrollToSeerrFocus()
             end if
             return true
         end if
@@ -2483,11 +1521,3 @@ function onKeyEvent(key as string, press as boolean) as boolean
     return false
 end function
 
-' Theme music runs on its own audio node, which holds the media pipeline. Leaving it going
-' when the video player is created stalls or fails playback, so it stops whenever this
-' screen goes away, whichever route the viewer took
-sub OnScreenHidden()
-    if isValid(m.themeMusicPlayer)
-        m.themeMusicPlayer.callFunc("stopMusic")
-    end if
-end sub
