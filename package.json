@@ -10,10 +10,8 @@
   "devDependencies": {
     "@rokucommunity/bslint": "0.8.38",
     "brighterscript": "0.70.3",
-    "jshint": "2.13.6",
     "rimraf": "6.1.3",
-    "roku-deploy": "3.16.1",
-    "undent": "1.0.0"
+    "roku-deploy": "3.16.1"
   },
   "scripts": {
     "build": "npx rimraf build/ out/ && npx bsc --project bsconfig.json --out-file ./out/moonfin-roku-v$(node -p \"require('./package.json').version\").zip"
