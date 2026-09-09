@@ -1,8 +1,8 @@
 import "pkg:/source/api/MoonfinPlugin.bs"
 import "pkg:/source/utils/galleryGlow.bs"
 import "pkg:/source/utils/misc.bs"
-import "pkg:/source/utils/themeChrome.bs"
 import "pkg:/source/utils/themeApply.bs"
+import "pkg:/source/utils/themeChrome.bs"
 
 ' Panel geometry, taken from the other clients, which write their layout in the
 ' same 1920x1080 pixels this screen uses
@@ -201,13 +201,15 @@ sub showGalleryRatings(data as object)
         return
     end if
 
-    m.galleryRatings.ratingsData = { data: [{
-        source: "stars",
-        name: tr("Community"),
-        iconPath: "pkg:/images/sharp_star_white_18dp.png",
-        iconBlendColor: "#FFD700",
-        formatted: community
-    }] }
+    m.galleryRatings.ratingsData = {
+        data: [{
+            source: "stars",
+            name: tr("Community"),
+            iconPath: "pkg:/images/sharp_star_white_18dp.png",
+            iconBlendColor: "#FFD700",
+            formatted: community
+        }]
+    }
 end sub
 
 ' The left column is stacked, then the pair is centred on the panel the way the

@@ -1,7 +1,7 @@
+import "pkg:/source/utils/fontApply.bs"
 import "pkg:/source/utils/misc.bs"
 import "pkg:/source/utils/themeApply.bs"
 import "pkg:/source/utils/themeChrome.bs"
-import "pkg:/source/utils/fontApply.bs"
 
 sub init()
     m.barBg = m.top.findNode("barBg")

@@ -1,21 +1,21 @@
-import "pkg:/source/api/Image.bs"
-import "pkg:/source/api/MoonfinPlugin.bs"
-import "pkg:/source/utils/config.bs"
-import "pkg:/source/utils/buttonLayout.bs"
-import "pkg:/source/utils/detailButtons.bs"
-import "pkg:/source/utils/fontApply.bs"
-import "pkg:/source/utils/misc.bs"
-import "pkg:/source/utils/remoteSubtitles.bs"
-import "pkg:/source/utils/SeerrUtils.bs"
-import "pkg:/source/utils/mediaBadges.bs"
-import "pkg:/source/utils/seerrButtons.bs"
-import "pkg:/source/utils/detailActions.bs"
-import "pkg:/source/utils/seerrDetailHost.bs"
-import "pkg:/source/utils/multiserver.bs"
-import "pkg:/components/details/detailTrackHost.bs"
+import "pkg:/components/details/detailButtonHost.bs"
 import "pkg:/components/details/detailMetadataHost.bs"
 import "pkg:/components/details/detailScreenHost.bs"
-import "pkg:/components/details/detailButtonHost.bs"
+import "pkg:/components/details/detailTrackHost.bs"
+import "pkg:/source/api/Image.bs"
+import "pkg:/source/api/MoonfinPlugin.bs"
+import "pkg:/source/utils/buttonLayout.bs"
+import "pkg:/source/utils/config.bs"
+import "pkg:/source/utils/detailActions.bs"
+import "pkg:/source/utils/detailButtons.bs"
+import "pkg:/source/utils/fontApply.bs"
+import "pkg:/source/utils/mediaBadges.bs"
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/multiserver.bs"
+import "pkg:/source/utils/remoteSubtitles.bs"
+import "pkg:/source/utils/seerrButtons.bs"
+import "pkg:/source/utils/seerrDetailHost.bs"
+import "pkg:/source/utils/SeerrUtils.bs"
 
 import "pkg:/source/enums/AnimationControl.bs"
 import "pkg:/source/enums/AnimationState.bs"
@@ -1042,7 +1042,7 @@ end sub
 sub scrollToSeerrFocus()
     if not isValid(m.seerrBlock) then return
     top = CLASSIC_CONTAINER_TOP + m.seerrBlock.translation[1] + m.seerrBlock.focusedOffset
-    scrollContentTo(-(top - 200))
+    scrollContentTo(- (top - 200))
 end sub
 
 ' The poster ends level with the text beside it, but stays put rather than riding

@@ -1,10 +1,10 @@
 import "pkg:/source/api/baserequest.bs"
-import "pkg:/source/utils/remoteSubtitles.bs"
 import "pkg:/source/enums/MediaPlaybackState.bs"
 import "pkg:/source/enums/SubtitleSelection.bs"
 import "pkg:/source/enums/TaskControl.bs"
 import "pkg:/source/enums/TimerControl.bs"
 import "pkg:/source/enums/VideoControl.bs"
+import "pkg:/source/utils/remoteSubtitles.bs"
 
 const STILL_WATCHING_POPUP_TIMER_SECONDS = 60
 

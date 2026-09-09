@@ -13,9 +13,9 @@
 '   2. Route playback requests to the correct server
 '   3. Show server-specific images using the correct base URL
 
+import "pkg:/source/utils/mediaDedup.bs"
 import "pkg:/source/utils/misc.bs"
 import "pkg:/source/utils/multiserver.bs"
-import "pkg:/source/utils/mediaDedup.bs"
 
 sub init()
     m.top.functionName = "executeMultiServerRequests"

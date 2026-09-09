@@ -1,7 +1,7 @@
-import "pkg:/source/utils/misc.bs"
-import "pkg:/source/utils/libraryPanel.bs"
-import "pkg:/source/utils/trackDialog.bs"
 import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/utils/libraryPanel.bs"
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/trackDialog.bs"
 
 sub init()
     m.rowMenu = m.top.findNode("rowMenu")

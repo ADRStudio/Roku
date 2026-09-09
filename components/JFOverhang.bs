@@ -335,7 +335,7 @@ sub scrollToFocusedItem()
         targetScroll = m.scrollX
 
         if itemPos.x + m.scrollX < 0
-            targetScroll = - itemPos.x
+            targetScroll = -itemPos.x
         else if itemPos.x + itemPos.width + m.scrollX > m.clipWidth
             targetScroll = m.clipWidth - (itemPos.x + itemPos.width)
         end if

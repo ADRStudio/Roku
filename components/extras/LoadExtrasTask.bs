@@ -1,12 +1,12 @@
 import "pkg:/source/api/baserequest.bs"
 import "pkg:/source/api/Image.bs"
 import "pkg:/source/api/Items.bs"
+import "pkg:/source/api/MoonfinPlugin.bs"
 import "pkg:/source/api/sdk.bs"
 import "pkg:/source/enums/ItemType.bs"
 import "pkg:/source/utils/deviceCapabilities.bs"
-import "pkg:/source/utils/misc.bs"
 import "pkg:/source/utils/HomeRecommendations.bs"
-import "pkg:/source/api/MoonfinPlugin.bs"
+import "pkg:/source/utils/misc.bs"
 
 ' Fast parallel loading task for TV show details
 ' Loads seasons, next up, people, and similar items simultaneously

@@ -218,7 +218,7 @@ function formatRuntime(ticks as dynamic) as string
     if totalMinutes <= 0 then return ""
 
     hours = Int(totalMinutes / 60)
-    minutes = totalMinutes Mod 60
+    minutes = totalMinutes mod 60
     if hours > 0 then return `${hours.ToStr()}h ${minutes.ToStr()}m`
     return `${minutes.ToStr()}m`
 end function

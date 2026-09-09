@@ -1,5 +1,5 @@
-import "pkg:/source/utils/SeerrUtils.bs"
 import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/SeerrUtils.bs"
 
 sub init()
     m.discoverButton = m.top.findNode("discoverButton")

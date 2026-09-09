@@ -184,12 +184,14 @@ sub addButtons(itemData as object)
     candidates = []
 
     if isValid(itemData.MediaSources) and itemData.MediaSources.Count() > 1
-        candidates.push({ id: "version", config: {
-            icon: "pkg:/images/icons/detail_version.png",
-            label: tr("Versions"),
-            action: "versionTrack",
-            id: "versionButton"
-        } })
+        candidates.push({
+            id: "version", config: {
+                icon: "pkg:/images/icons/detail_version.png",
+                label: tr("Versions"),
+                action: "versionTrack",
+                id: "versionButton"
+            }
+        })
     end if
 
     if isValid(itemData.MediaStreams)
@@ -198,54 +200,66 @@ sub addButtons(itemData as object)
             if stream.Type = "Audio" then audioCount++
         end for
         if audioCount > 1
-            candidates.push({ id: "audio", config: {
-                icon: "pkg:/images/icons/detail_audio.png",
-                label: tr("Audio"),
-                action: "audioTrack",
-                id: "audioTrackButton"
-            } })
+            candidates.push({
+                id: "audio", config: {
+                    icon: "pkg:/images/icons/detail_audio.png",
+                    label: tr("Audio"),
+                    action: "audioTrack",
+                    id: "audioTrackButton"
+                }
+            })
         end if
     end if
 
-    candidates.push({ id: "subtitles", config: {
-        icon: "pkg:/images/icons/detail_subtitle.png",
-        label: tr("Subtitle"),
-        action: "subtitleTrack",
-        id: "subtitleButton"
-    } })
+    candidates.push({
+        id: "subtitles", config: {
+            icon: "pkg:/images/icons/detail_subtitle.png",
+            label: tr("Subtitle"),
+            action: "subtitleTrack",
+            id: "subtitleButton"
+        }
+    })
 
     if m.top.trailerAvailable
-        candidates.push({ id: "trailer", config: {
-            icon: "pkg:/images/icons/detail_trailer.png",
-            label: tr("Trailer"),
-            action: "trailer",
-            id: "trailerButton"
-        } })
+        candidates.push({
+            id: "trailer", config: {
+                icon: "pkg:/images/icons/detail_trailer.png",
+                label: tr("Trailer"),
+                action: "trailer",
+                id: "trailerButton"
+            }
+        })
     end if
 
     isWatched = chainLookupReturn(itemData, "UserData.Played", false)
-    candidates.push({ id: "watched", config: markActiveButton({
-        icon: "pkg:/images/icons/detail_watched.png",
-        label: isWatched ? tr("Watched") : tr("Unwatched"),
-        action: "watched",
-        id: "watchedButton"
-    }, isWatched, CLASSIC_WATCHED_INK) })
+    candidates.push({
+        id: "watched", config: markActiveButton({
+            icon: "pkg:/images/icons/detail_watched.png",
+            label: isWatched ? tr("Watched") : tr("Unwatched"),
+            action: "watched",
+            id: "watchedButton"
+        }, isWatched, CLASSIC_WATCHED_INK)
+    })
 
     isFavorited = chainLookupReturn(itemData, "UserData.IsFavorite", false)
-    candidates.push({ id: "favorite", config: markActiveButton({
-        icon: "pkg:/images/icons/detail_favorite.png",
-        label: isFavorited ? tr("Favorited") : tr("Favorite"),
-        action: "favorite",
-        id: "favoriteButton"
-    }, isFavorited, CLASSIC_FAVORITE_INK) })
+    candidates.push({
+        id: "favorite", config: markActiveButton({
+            icon: "pkg:/images/icons/detail_favorite.png",
+            label: isFavorited ? tr("Favorited") : tr("Favorite"),
+            action: "favorite",
+            id: "favoriteButton"
+        }, isFavorited, CLASSIC_FAVORITE_INK)
+    })
 
     if isEpisode()
-        candidates.push({ id: "goToSeries", config: {
-            icon: "pkg:/images/icons/detail_series.png",
-            label: tr("Go to Series"),
-            action: "goToSeries",
-            id: "goToSeriesButton"
-        } })
+        candidates.push({
+            id: "goToSeries", config: {
+                icon: "pkg:/images/icons/detail_series.png",
+                label: tr("Go to Series"),
+                action: "goToSeries",
+                id: "goToSeriesButton"
+            }
+        })
     end if
 
     addArrangedButtons(candidates)
@@ -275,35 +289,43 @@ sub addSeriesButtons()
     isFavorited = chainLookupReturn(m.top.itemContent, "json.UserData.IsFavorite", false)
 
     candidates = []
-    candidates.push({ id: "shuffle", config: {
-        icon: "pkg:/images/icons/detail_shuffle.png",
-        label: tr("Shuffle"),
-        action: "seriesShuffle",
-        id: "shuffleButton"
-    } })
+    candidates.push({
+        id: "shuffle", config: {
+            icon: "pkg:/images/icons/detail_shuffle.png",
+            label: tr("Shuffle"),
+            action: "seriesShuffle",
+            id: "shuffleButton"
+        }
+    })
 
     if m.top.trailerAvailable
-        candidates.push({ id: "trailer", config: {
-            icon: "pkg:/images/icons/detail_trailer.png",
-            label: tr("Trailer"),
-            action: "trailer",
-            id: "trailerButton"
-        } })
+        candidates.push({
+            id: "trailer", config: {
+                icon: "pkg:/images/icons/detail_trailer.png",
+                label: tr("Trailer"),
+                action: "trailer",
+                id: "trailerButton"
+            }
+        })
     end if
 
-    candidates.push({ id: "watched", config: markActiveButton({
-        icon: "pkg:/images/icons/detail_watched.png",
-        label: isWatched ? tr("Watched") : tr("Unwatched"),
-        action: "watched",
-        id: "watchedButton"
-    }, isWatched, CLASSIC_WATCHED_INK) })
+    candidates.push({
+        id: "watched", config: markActiveButton({
+            icon: "pkg:/images/icons/detail_watched.png",
+            label: isWatched ? tr("Watched") : tr("Unwatched"),
+            action: "watched",
+            id: "watchedButton"
+        }, isWatched, CLASSIC_WATCHED_INK)
+    })
 
-    candidates.push({ id: "favorite", config: markActiveButton({
-        icon: "pkg:/images/icons/detail_favorite.png",
-        label: isFavorited ? tr("Favorited") : tr("Favorite"),
-        action: "favorite",
-        id: "favoriteButton"
-    }, isFavorited, CLASSIC_FAVORITE_INK) })
+    candidates.push({
+        id: "favorite", config: markActiveButton({
+            icon: "pkg:/images/icons/detail_favorite.png",
+            label: isFavorited ? tr("Favorited") : tr("Favorite"),
+            action: "favorite",
+            id: "favoriteButton"
+        }, isFavorited, CLASSIC_FAVORITE_INK)
+    })
 
     addArrangedButtons(candidates)
 end sub

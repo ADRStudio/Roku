@@ -1,8 +1,8 @@
 import "pkg:/source/enums/ColorPalette.bs"
-import "pkg:/source/utils/misc.bs"
 import "pkg:/source/utils/libraryPanel.bs"
-import "pkg:/source/utils/trackDialog.bs"
+import "pkg:/source/utils/misc.bs"
 import "pkg:/source/utils/themeChrome.bs"
+import "pkg:/source/utils/trackDialog.bs"
 
 ' One row of a library dialog. Section headings, radio choices, checkboxes, settings and
 ' plain actions all take the same stride, so a whole dialog stays on one list.

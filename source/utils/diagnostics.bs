@@ -156,7 +156,7 @@ namespace diagnostics
         if not isValid(entries) then entries = []
 
         lines.push(`Entries: ${entries.Count()}`)
-        lines.push(String(60, "="))
+        lines.push(string(60, "="))
 
         for each entry in entries
             lines.push(diagnostics.FormatEntry(entry))
@@ -185,7 +185,7 @@ namespace diagnostics
 
         report = ["Moonfin for Roku crash report", `The previous session ended without shutting down. Generated: ${diagnostics.Stamp()}`]
         report.Append(diagnostics.HeaderLines())
-        report.push(String(60, "="))
+        report.push(string(60, "="))
         report.push(tail)
 
         task = createObject("roSGNode", "PostTask")

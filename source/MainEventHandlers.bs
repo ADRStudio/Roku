@@ -189,10 +189,10 @@ sub openSeerrBrowseTile(itemNode as object, selectedItemType as string)
     end if
 
     m.global.sceneManager.callFunc("pushScene", seerrBrowseRows.BrowseScreenFor(
-        chainLookupReturn(itemNode, "json.SeerrBrowseType", "genre"),
-        chainLookupReturn(itemNode, "json.SeerrBrowseId", 0),
-        chainLookupReturn(itemNode, "json.SeerrBrowseName", ""),
-        chainLookupReturn(itemNode, "json.SeerrMediaType", "movie")
+    chainLookupReturn(itemNode, "json.SeerrBrowseType", "genre"),
+    chainLookupReturn(itemNode, "json.SeerrBrowseId", 0),
+    chainLookupReturn(itemNode, "json.SeerrBrowseName", ""),
+    chainLookupReturn(itemNode, "json.SeerrMediaType", "movie")
     ))
 end sub
 

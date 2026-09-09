@@ -1,9 +1,9 @@
+import "pkg:/source/api/userauth.bs"
 import "pkg:/source/enums/KeyCode.bs"
 import "pkg:/source/enums/String.bs"
 import "pkg:/source/enums/TaskControl.bs"
 import "pkg:/source/utils/loginStyle.bs"
 import "pkg:/source/utils/misc.bs"
-import "pkg:/source/api/userauth.bs"
 
 ' How much air is left between the form and the keyboard, and how far up the
 ' form is allowed to go before it would run off the top
@@ -33,7 +33,7 @@ sub init()
     m.errorContainer.color = "#CC0000"
 
     m.config = m.top.findNode("configOptions")
-    m.config.focusBitmapBlendColor = "0x00A4DCFF" ' Blue focus 
+    m.config.focusBitmapBlendColor = "0x00A4DCFF" ' Blue focus
 
     username_field = CreateObject("roSGNode", "ConfigData")
     username_field.label = tr("Username")
@@ -183,7 +183,7 @@ sub hideQuickConnect()
 
     loginStyle.SetTabSelected(m.passwordTab, true)
     loginStyle.SetTabSelected(m.quickConnect, false)
-    
+
     m.submit.setFocus(true)
 end sub
 

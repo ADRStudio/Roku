@@ -28,7 +28,7 @@ sub init()
     if m.topParent.imageDisplayMode <> invalid
         m.itemPoster.loadDisplayMode = m.topParent.imageDisplayMode
     end if
-    
+
     themeApply.ApplyToItem(m.top)
 end sub
 

@@ -576,7 +576,7 @@ sub onIssueChanged(event as object)
     resolved = change.issue.status = SEERR_ISSUE_RESOLVED
     if resolved = m.activeIssueResolved then return
 
-    adjustCount("open", resolved ? -1 : 1)
+    adjustCount("open", resolved ? - 1 : 1)
 end sub
 
 ' ===== Counts =====

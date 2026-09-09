@@ -1,4 +1,3 @@
-import "pkg:/source/utils/diagnostics.bs"
 import "pkg:/source/api/baserequest.bs"
 import "pkg:/source/api/Image.bs"
 import "pkg:/source/enums/ColorPalette.bs"
@@ -15,6 +14,7 @@ import "pkg:/source/enums/TaskControl.bs"
 import "pkg:/source/enums/TimerControl.bs"
 import "pkg:/source/enums/VideoControl.bs"
 import "pkg:/source/utils/config.bs"
+import "pkg:/source/utils/diagnostics.bs"
 import "pkg:/source/utils/misc.bs"
 import "pkg:/source/utils/playbackOverlay.bs"
 
@@ -423,7 +423,7 @@ sub onScrubTimer()
     if m.scrubPosition < 0 then m.scrubPosition = 0
     if m.scrubPosition > m.top.duration then m.scrubPosition = m.top.duration
 
-    
+
     if isValid(m.scrubTime)
         m.scrubTime.text = secondsToHuman(m.scrubPosition, true) + " / " + secondsToHuman(m.top.duration, true)
     end if

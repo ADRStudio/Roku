@@ -628,17 +628,17 @@ sub onPosterLoadStatusChanged()
         posterW = m.itemPoster.width
 
         if posterW = 180
-            m.posterMask.maskUri   = "pkg:/images/posterVertMask.png"
-            m.posterMask.maskSize  = [180, 270]
+            m.posterMask.maskUri = "pkg:/images/posterVertMask.png"
+            m.posterMask.maskSize = [180, 270]
         else if posterW = 464
-            m.posterMask.maskUri   = "pkg:/images/posterWideMask.png"
-            m.posterMask.maskSize  = [464, 270]
+            m.posterMask.maskUri = "pkg:/images/posterWideMask.png"
+            m.posterMask.maskSize = [464, 270]
         else if posterW = 261
-            m.posterMask.maskUri   = "pkg:/images/posterSquareMask.png"
-            m.posterMask.maskSize  = [261, 270]
+            m.posterMask.maskUri = "pkg:/images/posterSquareMask.png"
+            m.posterMask.maskSize = [261, 270]
         else
-            m.posterMask.maskUri   = ""
-            m.posterMask.maskSize  = [0, 0]
+            m.posterMask.maskUri = ""
+            m.posterMask.maskSize = [0, 0]
         end if
     else
         ' Still loading, or out of fallbacks, so the name stands in for the artwork

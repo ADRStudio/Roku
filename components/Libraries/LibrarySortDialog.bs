@@ -1,9 +1,9 @@
-import "pkg:/source/utils/misc.bs"
-import "pkg:/source/utils/libraryPanel.bs"
-import "pkg:/source/utils/trackDialog.bs"
-import "pkg:/source/utils/librarySorts.bs"
-import "pkg:/source/utils/libraryFilters.bs"
 import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/utils/libraryFilters.bs"
+import "pkg:/source/utils/libraryPanel.bs"
+import "pkg:/source/utils/librarySorts.bs"
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/trackDialog.bs"
 
 ' How many values a facet opens on, since a tag list can run to thousands of entries and
 ' each one costs a focusable row

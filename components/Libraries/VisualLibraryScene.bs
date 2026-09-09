@@ -1,8 +1,4 @@
 
-import "pkg:/source/utils/tvKeyboard.bs"
-import "pkg:/source/utils/libraryCard.bs"
-import "pkg:/source/utils/librarySorts.bs"
-import "pkg:/source/utils/libraryFilters.bs"
 import "pkg:/source/api/baserequest.bs"
 import "pkg:/source/api/Image.bs"
 import "pkg:/source/api/MoonfinPlugin.bs"
@@ -14,7 +10,11 @@ import "pkg:/source/enums/String.bs"
 import "pkg:/source/enums/TaskControl.bs"
 import "pkg:/source/utils/config.bs"
 import "pkg:/source/utils/deviceCapabilities.bs"
+import "pkg:/source/utils/libraryCard.bs"
+import "pkg:/source/utils/libraryFilters.bs"
+import "pkg:/source/utils/librarySorts.bs"
 import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/tvKeyboard.bs"
 
 ' The age rating and series status badges, sized around whatever they are given
 const PILL_PAD_X = 18

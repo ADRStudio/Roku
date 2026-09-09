@@ -1,7 +1,7 @@
 import "pkg:/source/enums/TaskControl.bs"
 import "pkg:/source/utils/misc.bs"
-import "pkg:/source/utils/SeerrUtils.bs"
 import "pkg:/source/utils/seerrButtons.bs"
+import "pkg:/source/utils/SeerrUtils.bs"
 import "pkg:/source/utils/tvKeyboard.bs"
 
 ' Asking Seerr for a title, and taking the ask back. The ask itself is one dialog, the same

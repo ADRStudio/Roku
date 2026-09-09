@@ -451,7 +451,7 @@ sub showActionPrompt(title as string, options as object, callback as string, ext
     m.actionPrompt.message = extras.message ?? ""
     m.actionPrompt.options = options
     m.actionPrompt.optionDetails = extras.details ?? []
-    m.actionPrompt.selectedOption = extras.selected ?? -1
+    m.actionPrompt.selectedOption = extras.selected ?? - 1
     m.actionPrompt.returnFocus = seerrFocusTarget()
     m.actionPrompt.observeField("optionSelected", callback)
 

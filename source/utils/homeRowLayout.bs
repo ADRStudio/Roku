@@ -426,11 +426,11 @@ namespace homeRowLayout
     ' that is currently off, so saving a layout never erases either.
     function Save(order as object, hidden as object) as object
         return buttonLayout.WithUnknownIds(
-            homeRowLayout.Offered(),
-            order,
-            hidden,
-            get_user_setting(homeRowLayout.ORDER_SETTING),
-            get_user_setting(homeRowLayout.HIDDEN_SETTING)
+        homeRowLayout.Offered(),
+        order,
+        hidden,
+        get_user_setting(homeRowLayout.ORDER_SETTING),
+        get_user_setting(homeRowLayout.HIDDEN_SETTING)
         )
     end function
 
