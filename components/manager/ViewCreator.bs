@@ -348,15 +348,6 @@ end sub
 
 ' Playback state change event handlers
 sub onStateChange()
-
-    currentItem = m.global.queueManager.callFunc("getCurrentItem")
-    if isValid(currentItem)
-        itemServerData = getServerInfoFromItem(currentItem)
-        if isValid(itemServerData)
-        else
-        end if
-    end if
-
     ' If the state changed due to an error, we don't want to continue the queue
     if m.view.errorCode <> 0
         m.global.queueManager.callFunc("clear")

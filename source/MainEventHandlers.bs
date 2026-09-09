@@ -5,6 +5,7 @@ import "pkg:/source/enums/PlaybackMethod.bs"
 import "pkg:/source/enums/ResumePopupAction.bs"
 import "pkg:/source/enums/String.bs"
 import "pkg:/source/enums/SubtitleSelection.bs"
+import "pkg:/source/utils/diagnostics.bs"
 import "pkg:/source/utils/misc.bs"
 import "pkg:/source/utils/multiserver.bs"
 import "pkg:/source/utils/seerrBrowseRows.bs"
@@ -1653,12 +1654,10 @@ sub onRoDeviceInfoEvent(msg)
     end if
 
     if isValid(event.generalMemoryLevel)
-        ' Handle low memory event
-        print "Memory Warning - Level: " ; event.generalMemoryLevel
+        diagnostics.General(`Low memory warning, level ${event.generalMemoryLevel}`, diagnostics.LEVEL_WARN)
 
-        ' If memory is critically low, try to clear caches
         if event.generalMemoryLevel = "critical"
-            print "Critical memory condition - attempting cache clear"
+            diagnostics.General("Memory critical, clearing the active scene to reclaim some", diagnostics.LEVEL_ERROR)
             group = m.global.sceneManager.callFunc("getActiveScene")
             if isValid(group) and group.isSubType("JFScreen")
                 ' Force garbage collection by clearing and rebuilding scene

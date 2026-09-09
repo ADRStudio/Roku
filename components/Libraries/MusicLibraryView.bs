@@ -911,15 +911,9 @@ end sub
 'Item Selected
 sub onItemSelected()
     selectedItem = m.itemGrid.content.getChild(m.itemGrid.itemSelected)
-    print "[MusicLibraryView] onItemSelected - Item type: "; selectedItem.type
-    if isValid(selectedItem.json)
-        print "[MusicLibraryView] onItemSelected - JSON type: "; selectedItem.json.type
-    end if
-    print "[MusicLibraryView] onItemSelected - Item ID: "; selectedItem.id
 
     ' Audio items should use quickPlayNode for direct playback
     if selectedItem.type = "audio"
-        print "[MusicLibraryView] Setting quickPlayNode for audio item"
         m.top.quickPlayNode = selectedItem
     else
         m.top.selectedItem = selectedItem

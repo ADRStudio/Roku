@@ -4,6 +4,7 @@ import "pkg:/source/api/sdk.bs"
 import "pkg:/source/enums/ImageType.bs"
 import "pkg:/source/enums/ItemType.bs"
 import "pkg:/source/utils/config.bs"
+import "pkg:/source/utils/diagnostics.bs"
 import "pkg:/source/utils/misc.bs"
 import "pkg:/source/utils/multiserver.bs"
 
@@ -57,7 +58,7 @@ sub loadGenreItems()
         ' Check timeout
         currentTime = CreateObject("roDateTime").AsSeconds()
         if currentTime - startTime > 15
-            print "[GenresTask] Timeout waiting for server responses"
+            diagnostics.Network("Genres request timed out waiting for the server", diagnostics.LEVEL_WARN)
             exit while
         end if
 
