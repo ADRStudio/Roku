@@ -5,6 +5,16 @@
     {
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true
+    },
+    {
+      "description": "A compile is the only check this repo has, so anything it can't vouch for needs a person. brighterscript and bslint are the compile, so they would be reviewing their own upgrade. bslib ships inside the channel and roku-deploy signs the package, and neither is exercised by a build.",
+      "matchPackageNames": [
+        "brighterscript",
+        "@rokucommunity/bslint",
+        "@rokucommunity/bslib",
+        "roku-deploy"
+      ],
+      "automerge": false
     }
   ]
 }
