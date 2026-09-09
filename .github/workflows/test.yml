@@ -30,3 +30,26 @@ jobs:
         with:
           name: Jellyfin-Roku-dev-${{ github.sha }}
           path: ${{ github.workspace }}/build/staging
+
+  # What the PR Comment workflow reads. Without always() a failed build skips this,
+  # no artifact is uploaded, and the comment has nothing to read, so the run that
+  # most needs a comment is the one that never gets one.
+  save-pr-results:
+    if: always() && github.event_name == 'pull_request'
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write outcomes.json
+        run: |
+          cat > outcomes.json <<EOF
+          {
+            "pr_number": ${{ github.event.pull_request.number }},
+            "sha": "${{ github.event.pull_request.head.sha }}",
+            "build": "${{ needs.test.result }}"
+          }
+          EOF
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: build-results
+          path: outcomes.json
