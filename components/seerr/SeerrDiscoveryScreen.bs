@@ -718,8 +718,8 @@ function onKeyEvent(key as string, press as boolean) as boolean
         end if
 
         if isValid(m.categoryRows) and m.categoryRows.hasFocus()
-            rowIndex = m.categoryRows.rowItemFocused[0]
-            if rowIndex = 0
+            focusedIndex = m.categoryRows.rowItemFocused
+            if isValidAndNotEmpty(focusedIndex) and focusedIndex[0] = 0
                 m.requestsButton.setFocus(true)
                 m.top.lastFocus = m.requestsButton
                 return true
