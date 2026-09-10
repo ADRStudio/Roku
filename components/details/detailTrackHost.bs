@@ -17,6 +17,7 @@ import "pkg:/source/enums/VideoType.bs"
 '   sub refreshAfterVersionChange()
 
 sub SetUpVideoOptions(streams)
+    if not isValid(streams) then streams = []
     videos = []
 
     for i = 0 to streams.Count() - 1
@@ -54,6 +55,8 @@ sub SetUpVideoOptions(streams)
 end sub
 
 sub SetUpAudioOptions(streams)
+    if not isValid(streams) then streams = []
+
     preferredSubtitle = m.global.queueManager.callFunc("getPreferredSubtitleTrack")
     selectedSubtitle = isChainValid(preferredSubtitle, "StreamIndex") ? preferredSubtitle.StreamIndex : SubtitleSelection.NONE
 
@@ -83,6 +86,8 @@ sub SetUpAudioOptions(streams)
 end sub
 
 sub SetDefaultAudioTrack(itemData)
+    if not isChainValid(itemData, "mediaStreams") then return
+
     preferredAudioTrackIndex = m.global.queueManager.callFunc("getPreferredAudioTrackIndex")
     preferredAudioTrackName = m.global.queueManager.callFunc("getPreferredAudioTrackName")
     preferredLanguage = getPreferredLanguage("playback.audioPreferredLanguage")

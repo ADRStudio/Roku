@@ -323,9 +323,12 @@ sub loadInitialItems()
 
     itemId = getParentItemId()
 
-    m.sortField = m.global.session.user.settings["display." + itemId + ".sortField"]
-    m.view = m.global.session.user.settings["display." + itemId + ".landing"]
-    m.sortAscending = m.global.session.user.settings["display." + itemId + ".sortAscending"]
+    ' The settings map is gone once the user signs out, and a library can still reload on the way there
+    userSettings = chainLookupReturn(m.global.session, "user.settings", {})
+
+    m.sortField = userSettings["display." + itemId + ".sortField"]
+    m.view = userSettings["display." + itemId + ".landing"]
+    m.sortAscending = userSettings["display." + itemId + ".sortAscending"]
     m.filterState = storedFilterState(itemId)
 
     ' If user has not set a preferred view for this folder, check if they've set a default view
@@ -336,7 +339,7 @@ sub loadInitialItems()
             settingName = `display.${ItemType.PHOTO}library.defaultview`
         end if
 
-        m.view = m.global.session.user.settings[settingName]
+        m.view = userSettings[settingName]
     end if
 
     if not isValidAndNotEmpty(m.sortField) then m.sortField = "SortName"

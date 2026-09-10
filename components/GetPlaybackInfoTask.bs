@@ -13,6 +13,9 @@ function ItemPostPlaybackInfo(id as string)
     currentView = m.global.sceneManager.callFunc("getActiveScene")
     currentItem = m.global.queueManager.callFunc("getCurrentItem")
 
+    ' The queue can empty while the player is still up
+    if not isValid(currentItem) or not isValid(currentView) then return invalid
+
     body = {
         "DeviceProfile": getDeviceProfile()
     }

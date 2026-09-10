@@ -11,9 +11,12 @@ const STILL_WATCHING_POPUP_TIMER_SECONDS = 60
 
 ' Play Audio
 sub CreateAudioPlayerView()
-    if m.global.audioPlayer.id <> m.global.queueManager.callFunc("getCurrentItem").id
+    currentItem = m.global.queueManager.callFunc("getCurrentItem")
+    if not isValid(currentItem) then return
+
+    if m.global.audioPlayer.id <> currentItem.id
         m.global.audioPlayer.id = invalid
-        m.global.audioPlayer.id = m.global.queueManager.callFunc("getCurrentItem").id
+        m.global.audioPlayer.id = currentItem.id
     end if
 
     ' Only bypass creating an audio player view if the current queue is only audio
@@ -56,6 +59,7 @@ sub CreateVideoPlayerView()
     end if
 
     currentItem = m.global.queueManager.callFunc("getCurrentItem")
+    if not isValid(currentItem) then return
 
     ' If the user has set a preferred audio track index, use it
     preferredAudioTrackIndex = m.global.queueManager.callFunc("getPreferredAudioTrackIndex")
@@ -108,7 +112,7 @@ sub onSelectAudioPressed()
     currentItem = m.global.queueManager.callFunc("getCurrentItem")
     selectedAudioIndex = m.view.audioIndex
     if not isValid(selectedAudioIndex) or selectedAudioIndex < 0
-        if isValid(currentItem.selectedAudioStreamIndex)
+        if isChainValid(currentItem, "selectedAudioStreamIndex")
             selectedAudioIndex = currentItem.selectedAudioStreamIndex
         end if
     end if

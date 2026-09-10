@@ -777,11 +777,17 @@ function inArray(haystack as object, needle as dynamic) as boolean
 end function
 
 function toString(input) as string
-    if LCase(type(input)) = "rostring" or LCase(type(input)) = "string"
-        return input
+    valueType = LCase(type(input))
+
+    if valueType = "rostring" or valueType = "string" then return input
+    if valueType = "roboolean" or valueType = "boolean" then return input ? "true" : "false"
+
+    ' str() only accepts a number, so every other type throws a type mismatch
+    if valueType = "roint" or valueType = "integer" or valueType = "rofloat" or valueType = "float" or valueType = "rodouble" or valueType = "double" or valueType = "rolonginteger" or valueType = "longinteger"
+        return str(input)
     end if
 
-    return str(input)
+    return ""
 end function
 
 '

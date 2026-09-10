@@ -30,6 +30,8 @@ end function
 ' onCurrentTimeTimerFire: Code that runs every time the currentTimeTimer fires
 '
 sub onCurrentTimeTimerFire()
+    if not isValid(m.dateTimeObject) then return
+
     ' Refresh time variable
     m.dateTimeObject.Mark()
 

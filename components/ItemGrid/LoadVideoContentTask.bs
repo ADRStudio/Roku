@@ -44,14 +44,15 @@ sub loadItems()
 
     ' Only show preroll once per queue
     if m.global.queueManager.callFunc("isPrerollActive")
+        currentItem = m.global.queueManager.callFunc("getCurrentItem")
         ' Prerolls not allowed if we're resuming video
-        if m.global.queueManager.callFunc("getCurrentItem").startingPoint = 0
+        if isValid(currentItem) and currentItem.startingPoint = 0
             preRoll = GetIntroVideos(m.top.itemId)
             if isValid(preRoll) and preRoll.TotalRecordCount > 0 and isValid(preRoll.items[0])
                 ' If an error is thrown in the Intros plugin, instead of passing the error they pass the entire rick roll music video.
                 ' Bypass the music video and treat it as an error message
                 if lcase(preRoll.items[0].name) <> "rick roll'd"
-                    m.global.queueManager.callFunc("push", m.global.queueManager.callFunc("getCurrentItem"))
+                    m.global.queueManager.callFunc("push", currentItem)
                     m.top.itemId = preRoll.items[0].id
                     m.global.queueManager.callFunc("setPrerollStatus", false)
                     m.top.isIntro = true

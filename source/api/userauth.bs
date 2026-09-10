@@ -45,7 +45,7 @@ sub SignOut(deleteSavedEntry = true as boolean)
     session.user.Logout()
     m.global.sceneManager.currentUser = ""
     group = m.global.sceneManager.callFunc("getActiveScene")
-    group.optionsAvailable = false
+    if isValid(group) then group.optionsAvailable = false
 end sub
 
 ' Points the session at a saved account so the next sign in picks it up without

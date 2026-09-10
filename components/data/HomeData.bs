@@ -92,7 +92,7 @@ sub setData()
         if datum.ParentThumbImageTag <> invalid and isValidAndNotEmpty(datum.ParentThumbItemId)
             imgParams["Tag"] = datum.ParentThumbImageTag
             m.top.widePosterUrl = getImageURL(datum.ParentThumbItemId, "Thumb", imgParams, serverData)
-        else if datum.ParentBackdropImageTags <> invalid and isValidAndNotEmpty(datum.ParentBackdropItemId)
+        else if isValidAndNotEmpty(datum.ParentBackdropImageTags) and isValidAndNotEmpty(datum.ParentBackdropItemId)
             imgParams["Tag"] = datum.ParentBackdropImageTags[0]
             m.top.widePosterUrl = getImageURL(datum.ParentBackdropItemId, "Backdrop", imgParams, serverData)
         else if isValid(datum.ImageTags) and datum.ImageTags.Primary <> invalid
@@ -122,7 +122,7 @@ sub setData()
         if datum.ImageTags <> invalid and datum.imageTags.Thumb <> invalid
             imgParams["Tag"] = datum.imageTags.Thumb
             m.top.widePosterUrl = getImageURL(datum.LookupCI("Id"), "Thumb", imgParams, serverData)
-        else if datum.BackdropImageTags <> invalid
+        else if isValidAndNotEmpty(datum.BackdropImageTags)
             imgParams["Tag"] = datum.BackdropImageTags[0]
             m.top.widePosterUrl = getImageURL(datum.LookupCI("Id"), "Backdrop", imgParams, serverData)
         end if
