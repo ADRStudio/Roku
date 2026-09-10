@@ -251,15 +251,7 @@ sub itemContentChanged()
     setBackdropImage(itemData)
 
     if not isSeries() and m.top.selectedVideoStreamId = "" and isValidAndNotEmpty(itemData.MediaSources)
-        for i = 0 to itemData.mediaStreams.Count() - 1
-            if itemData.mediaStreams[i].Type = "Video"
-                m.currentCodec = itemData.MediaStreams[i].Codec
-                if isStringEqual(PlaybackMethod.FORCETRANSCODEDISABLEREMUX, m.global.session.user.settings["playback.media.forceTranscode"] ?? PlaybackMethod.PLAYNORMALLY)
-                    m.global.queueManager.callFunc("setForceTranscode", PlaybackMethod.FORCETRANSCODEDISABLEREMUX, m.currentCodec)
-                    exit for
-                end if
-            end if
-        end for
+        SetCurrentVideoCodec(itemData)
         m.top.selectedVideoStreamId = itemData.MediaSources[0].id
     end if
 

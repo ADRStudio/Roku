@@ -85,8 +85,22 @@ sub SetUpAudioOptions(streams)
     m.trackData.subtitles = subtitleTracks
 end sub
 
+sub SetCurrentVideoCodec(itemData)
+    if not isValidAndNotEmpty(chainLookup(itemData, "mediaStreams")) then return
+
+    for i = 0 to itemData.mediaStreams.Count() - 1
+        if itemData.mediaStreams[i].Type = "Video"
+            m.currentCodec = itemData.mediaStreams[i].Codec
+            if isStringEqual(PlaybackMethod.FORCETRANSCODEDISABLEREMUX, m.global.session.user.settings["playback.media.forceTranscode"] ?? PlaybackMethod.PLAYNORMALLY)
+                m.global.queueManager.callFunc("setForceTranscode", PlaybackMethod.FORCETRANSCODEDISABLEREMUX, m.currentCodec)
+                exit for
+            end if
+        end if
+    end for
+end sub
+
 sub SetDefaultAudioTrack(itemData)
-    if not isChainValid(itemData, "mediaStreams") then return
+    if not isValidAndNotEmpty(chainLookup(itemData, "mediaStreams")) then return
 
     preferredAudioTrackIndex = m.global.queueManager.callFunc("getPreferredAudioTrackIndex")
     preferredAudioTrackName = m.global.queueManager.callFunc("getPreferredAudioTrackName")
