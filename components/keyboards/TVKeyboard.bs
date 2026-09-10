@@ -475,8 +475,10 @@ sub pressKey(entry as string)
 
     if entry = "DONE"
         m.top.text = m.field.text
-        m.top.submitted = true
+        ' Put away before the screen is told, since that runs on this thread and
+        ' a screen asking for a second field reopens the panel inside the call
         m.top.visible = false
+        m.top.submitted = true
         return
     end if
 
@@ -610,8 +612,8 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if m.altPopup.visible then return handleAlternatesKey(key)
 
     if key = KeyCode.BACK
-        m.top.cancelled = true
         m.top.visible = false
+        m.top.cancelled = true
         return true
     end if
 
